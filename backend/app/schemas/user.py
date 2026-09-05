@@ -27,10 +27,16 @@ class UserLoginByEmail(BaseModel):
 # NEW — used by the new Sign Up page
 # No login_id (auto-generated), no role (defaulted to Customer)
 class UserSignUp(BaseModel):
-    name:             str
+    login_id:         Optional[str] = None
+    name:             Optional[str] = None
     email:            EmailStr
     password:         str
     confirm_password: str
+
+
+class UserProfileUpdate(BaseModel):
+    name:     Optional[str] = None
+    password: Optional[str] = None
 
 
 class UserResponse(BaseModel):
@@ -53,4 +59,5 @@ class TokenResponse(BaseModel):
     user_id:      int
     user_name:    str
     login_id:     str
+    email:        Optional[str] = None
     role:         str

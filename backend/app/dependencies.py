@@ -73,47 +73,72 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
         if login_id is None:
             raise credentials_error
 
+        # Ensure email and name exist in payload even for older tokens
+        if "email" not in payload or "role" not in payload:
+            from app.models.user import User
+            from app.database import SessionLocal
+            db_session = SessionLocal()
+            try:
+                user_obj = db_session.query(User).filter(User.login_id == login_id).first()
+                if user_obj:
+                    payload["email"] = user_obj.email
+                    payload["name"] = user_obj.name
+                    payload["id"] = user_obj.id
+                    payload["role"] = user_obj.role
+            finally:
+                db_session.close()
+
     except JWTError:
-        # JWTError covers: invalid signature, expired token, malformed token.
-        # In all cases we return the same 401 error — we don't tell the
-        # client WHY the token failed (security best practice).
         raise credentials_error
 
-    # Return the user's info extracted from the token.
-    # The route function receives this as its "current_user" parameter.
-    # It contains everything we put in the token during login:
-    #   {"sub": "ADMIN001", "id": 1, "role": "Admin", "exp": ...}
     return payload
 
 
-# ---- ROLE CHECK HELPER ---------------------------------
-# This dependency builds ON TOP of get_current_user.
-# It first gets the current user (verifies token),
-# then checks if their role is allowed to perform the action.
-#
-# Usage in a router:
-#   def create(..., current_user: dict = Depends(require_admin_or_accountant)):
-#
-# Allowed roles: Admin and Accountant
-# Blocked roles: Customer
-#
-# WHY block Customer?
-#   Customers should not be able to create, edit, or delete
-#   contacts in the company's accounting system.
-#   Only internal staff (Admin and Accountant) should do that.
+# ---- ROLE CHECK HELPERS ---------------------------------
+
+def require_admin(
+    current_user: dict = Depends(get_current_user)
+) -> dict:
+    role = current_user.get("role")
+    if role != "Admin":
+        raise HTTPException(
+            status_code=403,
+            detail=f"Access denied. Admin role required. Your role: {role}"
+        )
+    return current_user
+
+
 def require_admin_or_accountant(
     current_user: dict = Depends(get_current_user)
 ) -> dict:
-
-    # Extract the role from the decoded token payload
     role = current_user.get("role")
-
-    # Check if the role is in the allowed list
     if role not in ["Admin", "Accountant"]:
         raise HTTPException(
-            status_code=403,   # 403 = Forbidden (you are logged in but not allowed)
+            status_code=403,
             detail=f"Access denied. Required role: Admin or Accountant. Your role: {role}"
         )
+    return current_user
 
-    # If role is allowed, return the user so the route can use it if needed
+
+def require_customer_or_staff(
+    current_user: dict = Depends(get_current_user)
+) -> dict:
+    role = current_user.get("role")
+    if role not in ["Customer", "Admin", "Accountant"]:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Access denied. Customer or staff access required. Your role: {role}"
+        )
+    return current_user
+
+
+def require_vendor_or_staff(
+    current_user: dict = Depends(get_current_user)
+) -> dict:
+    role = current_user.get("role")
+    if role not in ["Vendor", "Admin", "Accountant"]:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Access denied. Vendor or staff access required. Your role: {role}"
+        )
     return current_user

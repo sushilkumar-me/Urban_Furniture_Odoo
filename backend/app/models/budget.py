@@ -2,6 +2,7 @@ from sqlalchemy import Column, Integer, String, Numeric, Date, DateTime, Foreign
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
+from app.models.analytic_account import AnalyticAccount
 
 
 class Budget(Base):
@@ -35,9 +36,15 @@ class Budget(Base):
     # Optional — a budget can exist without a named owner.
     responsible_person  = Column(String(100), nullable=True)
 
+    # Wireframe status pipeline: Draft, Confirm, Revised, Cancelled
+    status              = Column(String(50), default="Draft")
+    revision_of_id      = Column(Integer, ForeignKey("budgets.id"), nullable=True)
+    achieved_amount     = Column(Numeric(12, 2), default=0)
+
     created_at          = Column(DateTime, default=func.now())
 
     # relationship: loads the AnalyticAccount object automatically.
     # budget.analytic_account.analytic_name → "Sofa Department"
     # lazy="joined" → single SQL JOIN query, not a separate query.
     analytic_account    = relationship("AnalyticAccount", lazy="joined")
+    revision_of         = relationship("Budget", remote_side=[id], lazy="joined")

@@ -37,3 +37,7 @@ bcrypt==4.0.1
 # We don't need to hit the database to verify them each time.
 # [cryptography] means: install with cryptography backend support.
 python-jose[cryptography]==3.3.0
+
+# Faker - realistic database dummy data generator
+faker>=30.0.0
+

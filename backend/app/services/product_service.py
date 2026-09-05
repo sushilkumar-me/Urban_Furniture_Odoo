@@ -21,7 +21,7 @@ UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "uploads")
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 
 # Allowed product types — must match PostgreSQL CHECK constraint
-ALLOWED_TYPES = {"Goods", "Service", "Consumable"}
+ALLOWED_TYPES = {"Goods", "Service", "Consumable", "Combo"}
 
 
 # ---- IMAGE SAVE FUNCTION -----------------------------------

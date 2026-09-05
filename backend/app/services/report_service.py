@@ -119,7 +119,7 @@ def generate_profit_and_loss(
                 total_income += net_income
 
         # Expense Accounts: Normal balance is (Debit - Credit)
-        elif acc.account_type == "Expense":
+        elif acc.account_type in ("Expense", "Expenses", "Other Expenses"):
             net_expense = deb - cred
             if acc.account_name == "Purchase Cost" and billed_purchases > 0:
                 net_expense += billed_purchases
@@ -212,21 +212,33 @@ def generate_balance_sheet(
     )
     je_map = {row.account_id: (Decimal(str(row.total_debit)), Decimal(str(row.total_credit))) for row in je_items}
 
-    # 2. Unpaid Customer Invoices (Accounts Receivable)
+    # 2. Unpaid Customer Invoices (Accounts Receivable = Invoiced - Payments Received)
     unpaid_invoices = (
         db.query(func.coalesce(func.sum(CustomerInvoice.total_amount), 0))
         .filter(and_(CustomerInvoice.status == "Posted", CustomerInvoice.invoice_date <= as_of_date))
         .scalar()
     )
-    ar_extra = Decimal(str(unpaid_invoices or 0))
+    paid_on_posted_invs = (
+        db.query(func.coalesce(func.sum(Payment.amount), 0))
+        .join(CustomerInvoice, CustomerInvoice.id == Payment.customer_invoice_id)
+        .filter(and_(CustomerInvoice.status == "Posted", Payment.payment_date <= as_of_date))
+        .scalar()
+    )
+    ar_extra = Decimal(str(unpaid_invoices or 0)) - Decimal(str(paid_on_posted_invs or 0))
 
-    # 3. Unpaid Vendor Bills (Accounts Payable)
+    # 3. Unpaid Vendor Bills (Accounts Payable = Billed - Payments Disbursed)
     unpaid_bills = (
         db.query(func.coalesce(func.sum(VendorBill.total_amount), 0))
         .filter(and_(VendorBill.status == "Posted", VendorBill.bill_date <= as_of_date))
         .scalar()
     )
-    ap_extra = Decimal(str(unpaid_bills or 0))
+    paid_on_posted_bills = (
+        db.query(func.coalesce(func.sum(Payment.amount), 0))
+        .join(VendorBill, VendorBill.id == Payment.vendor_bill_id)
+        .filter(and_(VendorBill.status == "Posted", Payment.payment_date <= as_of_date))
+        .scalar()
+    )
+    ap_extra = Decimal(str(unpaid_bills or 0)) - Decimal(str(paid_on_posted_bills or 0))
 
     # 4. Bank Payments (Cash Inflows & Outflows)
     received_payments = (
@@ -260,7 +272,7 @@ def generate_balance_sheet(
         deb, cred = je_map.get(acc.id, (Decimal("0.00"), Decimal("0.00")))
 
         # Assets: Normal balance is (Debit - Credit)
-        if acc.account_type == "Asset":
+        if acc.account_type in ("Asset", "Assets", "Bank", "Cash"):
             bal = deb - cred
             if "Bank" in acc.account_name and not bank_handled:
                 bal += net_bank_payments
@@ -281,7 +293,7 @@ def generate_balance_sheet(
                 total_assets += bal
 
         # Liabilities: Normal balance is (Credit - Debit)
-        elif acc.account_type == "Liability":
+        elif acc.account_type in ("Liability", "Liabilities"):
             bal = cred - deb
             if "Payable" in acc.account_name and not ap_handled:
                 bal += ap_extra
@@ -299,7 +311,7 @@ def generate_balance_sheet(
                 total_liabilities += bal
 
         # Equity: Normal balance is (Credit - Debit)
-        elif acc.account_type == "Equity":
+        elif acc.account_type in ("Equity", "Capital"):
             bal = cred - deb
             if bal != Decimal("0.00"):
                 equity_lines.append(

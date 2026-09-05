@@ -26,6 +26,9 @@ class BudgetCreate(BaseModel):
 
     planned_amount:      float
     responsible_person:  Optional[str] = None
+    status:              Optional[str] = "Draft"
+    revision_of_id:      Optional[int] = None
+    achieved_amount:     Optional[float] = 0.0
 
     # Validate that end_date is after start_date.
     # A budget period where end is before start makes no sense.
@@ -45,6 +48,9 @@ class BudgetUpdate(BaseModel):
     end_date:            Optional[date]  = None
     planned_amount:      Optional[float] = None
     responsible_person:  Optional[str]   = None
+    status:              Optional[str]   = None
+    revision_of_id:      Optional[int]   = None
+    achieved_amount:     Optional[float] = None
 
     @field_validator("planned_amount", mode="before")
     @classmethod
@@ -66,6 +72,9 @@ class BudgetResponse(BaseModel):
     end_date:            Optional[date]     = None
     planned_amount:      Decimal
     responsible_person:  Optional[str]      = None
+    status:              Optional[str]      = "Draft"
+    revision_of_id:      Optional[int]      = None
+    achieved_amount:     Optional[Decimal]  = Decimal("0.00")
     created_at:          Optional[datetime] = None
 
     model_config = {"from_attributes": True}

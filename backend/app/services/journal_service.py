@@ -6,7 +6,7 @@ from app.models.journal import Journal
 from app.models.account import Account
 from app.schemas.journal import JournalCreate, JournalUpdate
 
-ALLOWED_TYPES = {"Sale", "Purchase", "Bank", "Cash", "General"}
+ALLOWED_TYPES = {"Sale", "Sales", "Purchase", "Bank", "Cash", "General"}
 
 
 def create_journal(data: JournalCreate, db: Session) -> Journal:

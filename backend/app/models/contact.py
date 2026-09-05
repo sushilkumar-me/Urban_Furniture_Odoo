@@ -15,5 +15,5 @@ class Contact(Base):
     state        = Column(String(50), nullable=True)
     country      = Column(String(50), nullable=True)
     pincode      = Column(String(10), nullable=True)
-    image        = Column(String(255), nullable=True)
+    image        = Column(Text, nullable=True)
     created_at   = Column(DateTime, default=func.now())

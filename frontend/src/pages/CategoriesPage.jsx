@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
 import api from '../api'
 
 // emptyForm is the default state of the form fields.
@@ -35,29 +34,6 @@ function CategoriesPage() {
   // loading: true while API request is in progress
   // Disables the submit button to prevent double-clicking
   const [loading, setLoading]       = useState(false)
-
-  const navigate = useNavigate()
-  const location = useLocation()
-  const loginId  = localStorage.getItem('login_id') || 'User'
-
-  // navLinks: the navigation menu items
-  // Adding Categories here so the nav bar stays consistent
-  const navLinks = [
-    { label: 'Dashboard',  path: '/dashboard'  },
-    { label: 'Contacts',   path: '/contacts'   },
-    { label: 'Categories', path: '/categories' },
-    { label: 'Products',   path: '/products'   },
-    { label: 'Accounts',   path: '/accounts'   },
-    { label: 'Journals',   path: '/journals'   },
-    { label: 'Analytics',  path: '/analytic-accounts' },
-    { label: 'Budgets',    path: '/budgets'    },
-  ]
-
-  const handleLogout = () => {
-    localStorage.removeItem('token')
-    localStorage.removeItem('login_id')
-    navigate('/login')
-  }
 
   // useEffect runs once when the page first loads.
   // [] means: only run on mount, not on every re-render.
@@ -197,29 +173,7 @@ function CategoriesPage() {
   }
 
   return (
-    <div className="dashboard-container">
-
-      {/* Navbar — same structure as ContactsPage */}
-      <nav className="navbar">
-        <div className="navbar-brand">🪑 Urban Furniture Accounting</div>
-        <div className="navbar-links">
-          {navLinks.map(link => (
-            <button
-              key={link.path}
-              className={`nav-link ${location.pathname === link.path ? 'nav-link-active' : ''}`}
-              onClick={() => navigate(link.path)}
-            >
-              {link.label}
-            </button>
-          ))}
-        </div>
-        <div className="navbar-user">
-          <span>Welcome, <strong>{loginId}</strong></span>
-          <button onClick={handleLogout} className="logout-button">Logout</button>
-        </div>
-      </nav>
-
-      <div className="page-container">
+    <div className="page-container">
 
         {/* Page header with title and Add button */}
         <div className="page-header">
@@ -381,9 +335,7 @@ function CategoriesPage() {
             </table>
           )}
         </div>
-
       </div>
-    </div>
   )
 }
 

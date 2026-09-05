@@ -1,24 +1,6 @@
 import React, { useState, useEffect } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import api from '../api'
-
-const navLinks = [
-  { label: 'Dashboard',         path: '/dashboard'         },
-  { label: 'Contacts',          path: '/contacts'          },
-  { label: 'Categories',        path: '/categories'        },
-  { label: 'Products',          path: '/products'          },
-  { label: 'Accounts',          path: '/accounts'          },
-  { label: 'Journals',          path: '/journals'          },
-  { label: 'Analytics',         path: '/analytic-accounts' },
-  { label: 'Budgets',           path: '/budgets'           },
-  { label: 'Purchase Orders',   path: '/purchase-orders'   },
-  { label: 'Vendor Bills',      path: '/vendor-bills'      },
-  { label: 'Sales Orders',      path: '/sales-orders'      },
-  { label: 'Customer Invoices', path: '/customer-invoices' },
-  { label: 'Payments',          path: '/payments'          },
-  { label: 'Journal Entries',   path: '/journal-entries'   },
-  { label: 'Reports',           path: '/reports'           },
-]
 
 function ReportsPage() {
   const [activeTab, setActiveTab] = useState('pnl') // 'pnl' | 'bs' | 'budget'
@@ -43,14 +25,6 @@ function ReportsPage() {
   const [selectedAnalytic, setSelectedAnalytic] = useState('All')
 
   const navigate = useNavigate()
-  const location = useLocation()
-  const loginId  = localStorage.getItem('login_id') || 'User'
-
-  const handleLogout = () => {
-    localStorage.removeItem('token')
-    localStorage.removeItem('login_id')
-    navigate('/login')
-  }
 
   useEffect(() => {
     fetchAnalytics()
@@ -99,41 +73,41 @@ function ReportsPage() {
   }
 
   return (
-    <div className="dashboard-container">
-
-      {/* Navigation */}
-      <nav className="navbar">
-        <div className="navbar-brand">🪑 Urban Furniture Accounting</div>
-        <div className="navbar-links">
-          {navLinks.map(link => (
-            <button
-              key={link.path}
-              className={`nav-link ${location.pathname === link.path ? 'nav-link-active' : ''}`}
-              onClick={() => navigate(link.path)}
-            >
-              {link.label}
-            </button>
-          ))}
-        </div>
-        <div className="navbar-user">
-          <span>Welcome, <strong>{loginId}</strong></span>
-          <button onClick={handleLogout} className="logout-button">Logout</button>
-        </div>
-      </nav>
-
-      <div className="page-container">
+    <div className="page-container" style={{ maxWidth: '1020px', margin: '0 auto', padding: '24px 16px' }}>
 
         {/* Page Header */}
-        <div className="page-header">
+        <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
           <div>
-            <h2>📊 Financial Reports & Executive Analytics</h2>
-            <p className="page-subtitle">
+            <h2 style={{ margin: '0 0 6px 0', fontSize: '26px', fontWeight: 800, color: '#1a1a2e' }}>📊 Financial Reports & Executive Analytics</h2>
+            <p className="page-subtitle" style={{ margin: 0, color: '#64748b', fontSize: '14px' }}>
               Authoritative statements for GAAP/IFRS audit compliance and executive decision making
             </p>
           </div>
-          <button className="btn-secondary" onClick={handlePrint} style={{fontSize:'13px', display:'flex', alignItems:'center', gap:'6px'}}>
-            🖨️ Print Statement
-          </button>
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            <button className="btn-secondary" onClick={handlePrint} style={{ fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              🖨️ Print Statement
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate('/dashboard')}
+              style={{
+                background: '#ffffff',
+                border: '2px solid #64748b',
+                color: '#475569',
+                fontWeight: 700,
+                fontSize: '13px',
+                borderRadius: '8px',
+                padding: '7px 18px',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease'
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = '#f1f5f9' }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = '#ffffff' }}
+              title="Back to Dashboard"
+            >
+              Back
+            </button>
+          </div>
         </div>
 
         {error && <div className="error-message" style={{marginBottom:'16px'}}>⚠️ {error}</div>}
@@ -689,7 +663,6 @@ function ReportsPage() {
         )}
 
       </div>
-    </div>
   )
 }
 

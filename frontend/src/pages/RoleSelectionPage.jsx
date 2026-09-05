@@ -26,8 +26,15 @@ const ROLE_CONFIG = [
     role:  'Customer',
     label: 'Customer',
     icon:  '🛒',
-    hint:  'View your orders and account information',
+    hint:  'View your invoices and make online payments',
     path:  '/customer-dashboard'
+  },
+  {
+    role:  'Vendor',
+    label: 'Vendor / Supplier',
+    icon:  '🚚',
+    hint:  'View purchase bills and track incoming settlements',
+    path:  '/vendor-dashboard'
   }
 ]
 

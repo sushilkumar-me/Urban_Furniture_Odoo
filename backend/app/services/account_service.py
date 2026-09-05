@@ -5,7 +5,10 @@ from fastapi import HTTPException
 from app.models.account import Account
 from app.schemas.account import AccountCreate, AccountUpdate
 
-ALLOWED_TYPES = {"Asset", "Liability", "Equity", "Income", "Expense"}
+ALLOWED_TYPES = {
+    "Asset", "Assets", "Liability", "Liabilities", "Equity", "Capital",
+    "Income", "Expense", "Expenses", "Other Expenses", "Bank", "Cash"
+}
 
 
 def create_account(data: AccountCreate, db: Session) -> Account:

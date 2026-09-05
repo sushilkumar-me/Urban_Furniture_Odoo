@@ -5,7 +5,7 @@ from fastapi import HTTPException
 from app.models.analytic_account import AnalyticAccount
 from app.schemas.analytic_account import AnalyticAccountCreate, AnalyticAccountUpdate
 
-ALLOWED_TYPES = {"Project", "Department", "Product", "General"}
+ALLOWED_TYPES = {"Income", "Expense", "Expenses", "Project", "Department", "Product", "General"}
 
 
 def create_analytic_account(data: AnalyticAccountCreate, db: Session) -> AnalyticAccount:

@@ -5,14 +5,12 @@ import api from '../api'
 function SignUpPage() {
 
   const [formData, setFormData] = useState({
-    name:             '',
+    login_id:         '',
     email:            '',
     password:         '',
     confirm_password: ''
   })
 
-  // fieldErrors: per-field validation messages shown below each input
-  // error: general server error shown at the bottom
   const [fieldErrors, setFieldErrors] = useState({})
   const [error, setError]             = useState('')
   const [success, setSuccess]         = useState('')
@@ -21,27 +19,23 @@ function SignUpPage() {
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value })
-    // Clear the field-level error as soon as the user starts typing
     if (fieldErrors[e.target.name]) {
       setFieldErrors({ ...fieldErrors, [e.target.name]: '' })
     }
   }
 
-  // validate: runs before submitting to the server.
-  // Returns true if all fields are valid, false otherwise.
-  // Sets fieldErrors so each input shows its own message.
   const validate = () => {
     const errors = {}
 
-    if (!formData.name.trim()) {
-      errors.name = 'Full name is required.'
+    if (!formData.login_id.trim()) {
+      errors.login_id = 'Login ID is required.'
+    } else if (formData.login_id.trim().length > 12) {
+      errors.login_id = 'Login ID cannot exceed 12 characters.'
     }
 
     if (!formData.email.trim()) {
-      errors.email = 'Email is required.'
+      errors.email = 'Email ID is required.'
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      // Basic email format check using a regex
-      // The pattern checks: something @ something . something
       errors.email = 'Enter a valid email address.'
     }
 
@@ -52,13 +46,12 @@ function SignUpPage() {
     }
 
     if (!formData.confirm_password) {
-      errors.confirm_password = 'Please confirm your password.'
+      errors.confirm_password = 'Please re-enter your password.'
     } else if (formData.password !== formData.confirm_password) {
       errors.confirm_password = 'Passwords do not match.'
     }
 
     setFieldErrors(errors)
-    // Object.keys(errors).length === 0 means no errors found
     return Object.keys(errors).length === 0
   }
 
@@ -67,20 +60,23 @@ function SignUpPage() {
     setError('')
     setSuccess('')
 
-    // Run client-side validation first — don't hit the server if invalid
     if (!validate()) return
 
     setLoading(true)
 
     try {
-      // POST /auth/signup — no login_id or role needed
-      // Backend auto-generates login_id and assigns role=Customer
-      await api.post('/auth/signup', formData)
+      const payload = {
+        login_id:         formData.login_id.trim(),
+        name:             formData.login_id.trim(),
+        email:            formData.email.trim(),
+        password:         formData.password,
+        confirm_password: formData.confirm_password
+      }
 
+      await api.post('/auth/signup', payload)
       setSuccess('Account created successfully! Redirecting to Sign In...')
 
-      // Redirect to login after 2 seconds so user can read the success message
-      setTimeout(() => navigate('/login'), 2000)
+      setTimeout(() => navigate('/login'), 1800)
 
     } catch (err) {
       if (err.response?.data?.detail) {
@@ -94,74 +90,137 @@ function SignUpPage() {
   }
 
   return (
-    <div className="login-container">
-      <div className="login-card" style={{ maxWidth: '460px' }}>
+    <div className="login-container" style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px 16px' }}>
+      <div className="login-card" style={{ maxWidth: '440px', width: '100%', borderRadius: '20px', padding: '40px 32px', boxShadow: '0 15px 35px rgba(0,0,0,0.1)' }}>
 
-        <div className="login-header">
-          <h1>🪑 Urban Furniture</h1>
-          <h2>Accounting System</h2>
-          <p>Create your account</p>
+        {/* 1. App Logo Box (Matching Excalidraw Wireframe) */}
+        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            border: '2px solid #0f3460',
+            borderRadius: '16px',
+            padding: '12px 28px',
+            background: '#f8fafc',
+            boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.05)'
+          }}>
+            <span style={{ fontSize: '26px' }}>🪑</span>
+            <span style={{ fontWeight: 800, fontSize: '18px', color: '#0f3460', letterSpacing: '0.8px' }}>
+              Urban Furniture
+            </span>
+          </div>
+
+          <h2 style={{ fontSize: '22px', fontWeight: 800, color: '#1a1a2e', marginTop: '16px', marginBottom: '4px' }}>
+            Sign Up Page
+          </h2>
+          <p style={{ fontSize: '13px', color: '#64748b', margin: 0 }}>
+            Create a new portal customer account
+          </p>
         </div>
 
         <form onSubmit={handleSubmit} className="login-form">
 
-          <div className="form-group">
-            <label htmlFor="name">Full Name</label>
+          {/* 2. Enter Login Id - */}
+          <div className="form-group" style={{ marginBottom: '20px' }}>
+            <label htmlFor="login_id" style={{ fontWeight: 600, fontSize: '14px', color: '#334155', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              Enter Login Id -
+            </label>
             <input
               type="text"
-              id="name"
-              name="name"
-              value={formData.name}
+              id="login_id"
+              name="login_id"
+              value={formData.login_id}
               onChange={handleChange}
-              placeholder="e.g. John Smith"
-              autoComplete="name"
+              placeholder="e.g. rahul_corp (max 12 chars)"
+              maxLength={12}
+              required
+              autoComplete="username"
+              style={{
+                width: '100%',
+                height: '44px',
+                padding: '0 14px',
+                borderRadius: '8px',
+                border: fieldErrors.login_id ? '2px solid #ef4444' : '1px solid #cbd5e1',
+                fontSize: '14px',
+                outline: 'none'
+              }}
             />
-            {/* Show field-level error only for this input */}
-            {fieldErrors.name && (
-              <span style={{ fontSize: '12px', color: '#cc0000', marginTop: '4px' }}>
-                {fieldErrors.name}
+            {fieldErrors.login_id && (
+              <span style={{ fontSize: '12px', color: '#ef4444', marginTop: '4px', display: 'block' }}>
+                {fieldErrors.login_id}
               </span>
             )}
           </div>
 
-          <div className="form-group">
-            <label htmlFor="email">Email Address</label>
+          {/* 3. Enter Email Id - */}
+          <div className="form-group" style={{ marginBottom: '20px' }}>
+            <label htmlFor="email" style={{ fontWeight: 600, fontSize: '14px', color: '#334155', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              Enter Email Id -
+            </label>
             <input
               type="email"
               id="email"
               name="email"
               value={formData.email}
               onChange={handleChange}
-              placeholder="e.g. john@example.com"
+              placeholder="e.g. rahul@example.com"
+              required
               autoComplete="email"
+              style={{
+                width: '100%',
+                height: '44px',
+                padding: '0 14px',
+                borderRadius: '8px',
+                border: fieldErrors.email ? '2px solid #ef4444' : '1px solid #cbd5e1',
+                fontSize: '14px',
+                outline: 'none'
+              }}
             />
             {fieldErrors.email && (
-              <span style={{ fontSize: '12px', color: '#cc0000', marginTop: '4px' }}>
+              <span style={{ fontSize: '12px', color: '#ef4444', marginTop: '4px', display: 'block' }}>
                 {fieldErrors.email}
               </span>
             )}
           </div>
 
-          <div className="form-group">
-            <label htmlFor="password">Password</label>
+          {/* 4. Enter Password - */}
+          <div className="form-group" style={{ marginBottom: '20px' }}>
+            <label htmlFor="password" style={{ fontWeight: 600, fontSize: '14px', color: '#334155', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              Enter Password -
+            </label>
             <input
               type="password"
               id="password"
               name="password"
               value={formData.password}
               onChange={handleChange}
-              placeholder="At least 6 characters"
+              placeholder="Set a password (min 6 chars)"
+              required
               autoComplete="new-password"
+              style={{
+                width: '100%',
+                height: '44px',
+                padding: '0 14px',
+                borderRadius: '8px',
+                border: fieldErrors.password ? '2px solid #ef4444' : '1px solid #cbd5e1',
+                fontSize: '14px',
+                outline: 'none'
+              }}
             />
             {fieldErrors.password && (
-              <span style={{ fontSize: '12px', color: '#cc0000', marginTop: '4px' }}>
+              <span style={{ fontSize: '12px', color: '#ef4444', marginTop: '4px', display: 'block' }}>
                 {fieldErrors.password}
               </span>
             )}
           </div>
 
-          <div className="form-group">
-            <label htmlFor="confirm_password">Confirm Password</label>
+          {/* 5. Re-Enter Password - */}
+          <div className="form-group" style={{ marginBottom: '24px' }}>
+            <label htmlFor="confirm_password" style={{ fontWeight: 600, fontSize: '14px', color: '#334155', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              Re-Enter Password -
+            </label>
             <input
               type="password"
               id="confirm_password"
@@ -169,38 +228,61 @@ function SignUpPage() {
               value={formData.confirm_password}
               onChange={handleChange}
               placeholder="Re-enter your password"
+              required
               autoComplete="new-password"
+              style={{
+                width: '100%',
+                height: '44px',
+                padding: '0 14px',
+                borderRadius: '8px',
+                border: fieldErrors.confirm_password ? '2px solid #ef4444' : '1px solid #cbd5e1',
+                fontSize: '14px',
+                outline: 'none'
+              }}
             />
             {fieldErrors.confirm_password && (
-              <span style={{ fontSize: '12px', color: '#cc0000', marginTop: '4px' }}>
+              <span style={{ fontSize: '12px', color: '#ef4444', marginTop: '4px', display: 'block' }}>
                 {fieldErrors.confirm_password}
               </span>
             )}
           </div>
 
-          {/* Server-side error (e.g. email already registered) */}
-          {error && <div className="error-message">⚠️ {error}</div>}
+          {error   && <div className="error-message" style={{ marginBottom: '16px' }}>⚠️ {error}</div>}
+          {success && <div className="success-message" style={{ marginBottom: '16px' }}>✅ {success}</div>}
 
-          {/* Success message after account creation */}
-          {success && <div className="success-message">✅ {success}</div>}
+          {/* 6. Action Button (SIGN UP / SIGN IN matching wireframe) */}
+          <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+            <button
+              type="submit"
+              className="login-button"
+              disabled={loading}
+              style={{
+                width: '100%',
+                height: '48px',
+                fontSize: '16px',
+                fontWeight: 800,
+                letterSpacing: '1px',
+                textTransform: 'uppercase',
+                borderRadius: '12px',
+                cursor: 'pointer'
+              }}
+            >
+              {loading ? 'REGISTERING...' : 'SIGN UP'}
+            </button>
+          </div>
 
-          <button type="submit" className="login-button" disabled={loading}>
-            {loading ? 'Creating Account...' : 'Sign Up'}
-          </button>
-
-        </form>
-
-        <div className="login-hint">
-          <p>
+          {/* Return to Sign In link */}
+          <div style={{ textAlign: 'center', fontSize: '13px', color: '#64748b' }}>
             Already have an account?{' '}
             <span
               onClick={() => navigate('/login')}
-              style={{ color: '#0f3460', fontWeight: 600, cursor: 'pointer' }}
+              style={{ color: '#0f3460', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}
             >
               Sign In
             </span>
-          </p>
-        </div>
+          </div>
+
+        </form>
 
       </div>
     </div>

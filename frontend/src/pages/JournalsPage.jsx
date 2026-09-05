@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import api from '../api'
 
 const emptyForm = {
@@ -8,40 +8,21 @@ const emptyForm = {
   default_account_id: ''
 }
 
-const JOURNAL_TYPES = ['Bank', 'Cash', 'General', 'Purchase', 'Sale']
+const PRECONFIGURED_JOURNAL_NAMES = ['Sales', 'Purchase', 'Bank', 'Cash']
+const JOURNAL_TYPES = ['Sales', 'Purchase', 'Bank', 'Cash', 'General']
 
 function JournalsPage() {
-
-  const [journals, setJournals]   = useState([])
-  const [accounts, setAccounts]   = useState([])
-  const [showForm, setShowForm]   = useState(false)
-  const [editingId, setEditingId] = useState(null)
-  const [formData, setFormData]   = useState(emptyForm)
-  const [filter, setFilter]       = useState('All')
-  const [error, setError]         = useState('')
-  const [success, setSuccess]     = useState('')
-  const [loading, setLoading]     = useState(false)
+  const [journals, setJournals]       = useState([])
+  const [accounts, setAccounts]       = useState([])
+  const [showForm, setShowForm]       = useState(false)
+  const [editingId, setEditingId]     = useState(null)
+  const [formData, setFormData]       = useState(emptyForm)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [error, setError]             = useState('')
+  const [success, setSuccess]         = useState('')
+  const [loading, setLoading]         = useState(false)
 
   const navigate = useNavigate()
-  const location = useLocation()
-  const loginId  = localStorage.getItem('login_id') || 'User'
-
-  const navLinks = [
-    { label: 'Dashboard',  path: '/dashboard'  },
-    { label: 'Contacts',   path: '/contacts'   },
-    { label: 'Categories', path: '/categories' },
-    { label: 'Products',   path: '/products'   },
-    { label: 'Accounts',   path: '/accounts'   },
-    { label: 'Journals',   path: '/journals'   },
-    { label: 'Analytics',  path: '/analytic-accounts' },
-    { label: 'Budgets',    path: '/budgets'    },
-  ]
-
-  const handleLogout = () => {
-    localStorage.removeItem('token')
-    localStorage.removeItem('login_id')
-    navigate('/login')
-  }
 
   useEffect(() => {
     fetchJournals()
@@ -57,8 +38,6 @@ function JournalsPage() {
     }
   }
 
-  // fetchAccounts: loads all accounts for the default account dropdown.
-  // The accountant picks which account is the default for this journal.
   const fetchAccounts = async () => {
     try {
       const r = await api.get('/accounts/')
@@ -70,9 +49,10 @@ function JournalsPage() {
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value })
+    if (error) setError('')
   }
 
-  const openAddForm = () => {
+  const handleNew = () => {
     setFormData(emptyForm)
     setEditingId(null)
     setError('')
@@ -81,13 +61,12 @@ function JournalsPage() {
   }
 
   const openEditForm = (journal) => {
+    // Normalise 'Sale' to 'Sales' if returned from backend
+    const jType = journal.journal_type === 'Sale' ? 'Sales' : journal.journal_type
     setFormData({
       journal_name:       journal.journal_name,
-      journal_type:       journal.journal_type,
-      // default_account_id comes as a number from the API.
-      // We convert to string because HTML <select> value is always a string.
-      // Without String(), the dropdown would not pre-select the right option.
-      default_account_id: String(journal.default_account_id)
+      journal_type:       jType,
+      default_account_id: journal.default_account_id ? String(journal.default_account_id) : ''
     })
     setEditingId(journal.id)
     setError('')
@@ -107,115 +86,295 @@ function JournalsPage() {
     setError('')
     setLoading(true)
 
+    if (!formData.journal_name.trim()) {
+      setError('Journal Name is required.')
+      setLoading(false)
+      return
+    }
+
+    if (!formData.default_account_id) {
+      setError('Please select a Default Account from the Chart of Accounts.')
+      setLoading(false)
+      return
+    }
+
     const payload = {
-      journal_name:       formData.journal_name,
+      journal_name:       formData.journal_name.trim(),
+      // Backend supports 'Sale' and 'Sales'
       journal_type:       formData.journal_type,
-      // Convert back to number before sending to the API.
-      // The backend expects an integer, not a string.
       default_account_id: Number(formData.default_account_id)
     }
 
     try {
       if (editingId) {
         await api.put(`/journals/${editingId}`, payload)
-        setSuccess('Journal updated.')
+        setSuccess(`Journal "${formData.journal_name}" updated successfully.`)
       } else {
         await api.post('/journals/', payload)
-        setSuccess('Journal created.')
+        setSuccess(`Journal "${formData.journal_name}" created successfully.`)
       }
       await fetchJournals()
       closeForm()
     } catch (err) {
-      if (err.response?.data?.detail) {
-        setError(err.response.data.detail)
+      const detail = err.response?.data?.detail
+      if (Array.isArray(detail)) {
+        setError(detail.map(d => d.msg || d.loc?.join('.')).join(' | '))
+      } else if (typeof detail === 'object') {
+        setError(JSON.stringify(detail))
+      } else if (detail) {
+        setError(String(detail))
       } else {
-        setError('Something went wrong.')
+        setError('Something went wrong saving the journal.')
       }
     } finally {
       setLoading(false)
     }
   }
 
-  const handleDelete = async (id, name) => {
-    if (!window.confirm(`Delete journal "${name}"?\n\nNote: journals with entries cannot be deleted.`)) return
+  const handleDelete = async (id, name, e) => {
+    if (e) e.stopPropagation()
+    if (!window.confirm(`Delete journal "${name}"?\n\nNote: journals with existing entries cannot be deleted.`)) return
     try {
       await api.delete(`/journals/${id}`)
       setSuccess(`"${name}" deleted.`)
       await fetchJournals()
     } catch (err) {
-      if (err.response?.data?.detail) {
-        setError(err.response.data.detail)
-      } else {
-        setError('Failed to delete journal.')
-      }
+      const detail = err.response?.data?.detail
+      setError(typeof detail === 'string' ? detail : 'Failed to delete journal.')
     }
   }
 
-  const filtered = filter === 'All'
-    ? journals
-    : journals.filter(j => j.journal_type === filter)
-
-  // typeColor: returns a CSS class for each journal type badge
-  const typeColor = (type) => {
-    const map = {
-      'Bank':     'type-asset',
-      'Cash':     'type-income',
-      'Sale':     'type-equity',
-      'Purchase': 'type-liability',
-      'General':  'type-expense'
+  // Filter journals and prioritize wireframe ones
+  const filteredJournals = journals.filter(j => {
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase()
+      const matchName = (j.journal_name || '').toLowerCase().includes(q)
+      const matchType = (j.journal_type || '').toLowerCase().includes(q)
+      const matchAcc  = (j.default_account?.account_name || '').toLowerCase().includes(q)
+      if (!matchName && !matchType && !matchAcc) return false
     }
-    return map[type] || ''
+    return true
+  }).sort((a, b) => {
+    const aPre = PRECONFIGURED_JOURNAL_NAMES.indexOf(a.journal_name)
+    const bPre = PRECONFIGURED_JOURNAL_NAMES.indexOf(b.journal_name)
+    if (aPre !== -1 && bPre !== -1) return aPre - bPre
+    if (aPre !== -1) return -1
+    if (bPre !== -1) return 1
+    return a.journal_name.localeCompare(b.journal_name)
+  })
+
+  // Underlined input style matching wireframe
+  const underlineInputStyle = {
+    width: '100%',
+    border: 'none',
+    borderBottom: '2px solid #94a3b8',
+    background: 'transparent',
+    padding: '8px 4px',
+    fontSize: '16px',
+    outline: 'none',
+    color: '#1e293b',
+    transition: 'border-color 0.15s ease'
+  }
+
+  const typeBadgeClass = (type) => {
+    const t = (type || '').toLowerCase()
+    if (t.includes('bank')) return 'type-asset'
+    if (t.includes('cash')) return 'type-income'
+    if (t.includes('sale')) return 'type-equity'
+    if (t.includes('purchase')) return 'type-liability'
+    return 'type-expense'
   }
 
   return (
-    <div className="dashboard-container">
+    <div className="page-container" style={{ maxWidth: '960px', margin: '0 auto', padding: '24px 16px' }}>
 
-      <nav className="navbar">
-        <div className="navbar-brand">🪑 Urban Furniture Accounting</div>
-        <div className="navbar-links">
-          {navLinks.map(link => (
-            <button
-              key={link.path}
-              className={`nav-link ${location.pathname === link.path ? 'nav-link-active' : ''}`}
-              onClick={() => navigate(link.path)}
-            >
-              {link.label}
-            </button>
-          ))}
+      {/* Global Notifications */}
+      {success && (
+        <div className="success-message" style={{ marginBottom: '16px' }}>
+          ✅ {success}
         </div>
-        <div className="navbar-user">
-          <span>Welcome, <strong>{loginId}</strong></span>
-          <button onClick={handleLogout} className="logout-button">Logout</button>
+      )}
+      {!showForm && error && (
+        <div className="error-message" style={{ marginBottom: '16px' }}>
+          ⚠️ {error}
         </div>
-      </nav>
+      )}
 
-      <div className="page-container">
-
-        <div className="page-header">
-          <div>
-            <h2>Journals</h2>
-            <p className="page-subtitle">Financial transaction categories for your accounting</p>
+      {/* ============================================================ */}
+      {/* 1. JOURNAL FORM VIEW                                         */}
+      {/* ============================================================ */}
+      {showForm ? (
+        <div>
+          {/* Top Title: Journal Form View */}
+          <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+            <h1 style={{
+              fontSize: '28px',
+              fontWeight: 800,
+              color: '#1a1a2e',
+              letterSpacing: '-0.5px',
+              margin: 0
+            }}>
+              Journal Form View
+            </h1>
           </div>
-          <button className="btn-primary" onClick={openAddForm}>+ Add Journal</button>
-        </div>
 
-        {success && <div className="success-message" style={{marginBottom:'16px'}}>✅ {success}</div>}
-        {!showForm && error && <div className="error-message" style={{marginBottom:'16px'}}>⚠️ {error}</div>}
+          {/* Main Card Frame */}
+          <div style={{
+            background: '#ffffff',
+            border: '2px solid #e2e8f0',
+            borderRadius: '24px',
+            padding: '32px 36px',
+            boxShadow: '0 10px 30px rgba(0,0,0,0.06)',
+            marginBottom: '32px'
+          }}>
+            <form onSubmit={handleSubmit}>
 
-        {showForm && (
-          <div className="form-card">
-            <h3>{editingId ? 'Edit Journal' : 'Add New Journal'}</h3>
-            <form onSubmit={handleSubmit} className="contact-form">
+              {/* Action Bar: [ New ] [ Confirm ]  ...  [ Back ] */}
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '28px'
+              }}>
+                <div style={{ display: 'flex', gap: '14px' }}>
+                  <button
+                    type="button"
+                    onClick={handleNew}
+                    style={{
+                      background: '#ffffff',
+                      border: '2px solid #0f3460',
+                      color: '#0f3460',
+                      fontWeight: 700,
+                      fontSize: '15px',
+                      borderRadius: '12px',
+                      padding: '8px 26px',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = '#0f3460'; e.currentTarget.style.color = '#ffffff' }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = '#ffffff'; e.currentTarget.style.color = '#0f3460' }}
+                  >
+                    New
+                  </button>
 
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Journal Type *</label>
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    style={{
+                      background: '#0f3460',
+                      border: '2px solid #0f3460',
+                      color: '#ffffff',
+                      fontWeight: 700,
+                      fontSize: '15px',
+                      borderRadius: '12px',
+                      padding: '8px 28px',
+                      cursor: 'pointer',
+                      boxShadow: '0 3px 10px rgba(15, 52, 96, 0.25)',
+                      transition: 'all 0.15s ease'
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = '#16213e' }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = '#0f3460' }}
+                  >
+                    {loading ? 'Confirming...' : 'Confirm'}
+                  </button>
+                </div>
+
+                <div>
+                  <button
+                    type="button"
+                    onClick={closeForm}
+                    style={{
+                      background: '#ffffff',
+                      border: '2px solid #64748b',
+                      color: '#475569',
+                      fontWeight: 700,
+                      fontSize: '15px',
+                      borderRadius: '12px',
+                      padding: '8px 26px',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = '#f1f5f9' }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = '#ffffff' }}
+                  >
+                    Back
+                  </button>
+                </div>
+              </div>
+
+              {/* Form Error Banner */}
+              {error && (
+                <div className="error-message" style={{ marginBottom: '20px' }}>
+                  ⚠️ {error}
+                </div>
+              )}
+
+              {/* Journal Form Body */}
+              <div style={{
+                background: '#fcfdfe',
+                border: '1.5px solid #e2e8f0',
+                borderRadius: '18px',
+                padding: '28px',
+                marginBottom: '24px'
+              }}>
+
+                {/* Journal Name */}
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: '170px 1fr',
+                  alignItems: 'center',
+                  marginBottom: '28px'
+                }}>
+                  <label htmlFor="journal_name" style={{
+                    fontSize: '16px',
+                    fontWeight: 700,
+                    color: '#0f3460'
+                  }}>
+                    Journal Name *
+                  </label>
+                  <input
+                    type="text"
+                    id="journal_name"
+                    name="journal_name"
+                    value={formData.journal_name}
+                    onChange={handleChange}
+                    placeholder="e.g. Sales, Purchase, Bank, Cash"
+                    required
+                    style={{
+                      ...underlineInputStyle,
+                      fontSize: '17px',
+                      fontWeight: 600,
+                      borderBottomColor: '#0f3460'
+                    }}
+                  />
+                </div>
+
+                {/* Journal Type */}
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: '170px 1fr',
+                  alignItems: 'center',
+                  marginBottom: '28px'
+                }}>
+                  <label htmlFor="journal_type" style={{
+                    fontSize: '16px',
+                    fontWeight: 700,
+                    color: '#0f3460'
+                  }}>
+                    Journal Type *
+                  </label>
                   <select
+                    id="journal_type"
                     name="journal_type"
                     value={formData.journal_type}
                     onChange={handleChange}
-                    className="form-select"
                     required
+                    style={{
+                      ...underlineInputStyle,
+                      cursor: 'pointer',
+                      fontWeight: 600,
+                      borderBottomColor: '#0f3460'
+                    }}
                   >
                     {JOURNAL_TYPES.map(t => (
                       <option key={t} value={t}>{t}</option>
@@ -223,133 +382,295 @@ function JournalsPage() {
                   </select>
                 </div>
 
-                <div className="form-group">
-                  <label>Journal Name *</label>
-                  <input
-                    type="text"
-                    name="journal_name"
-                    value={formData.journal_name}
+                {/* Default Account (Many-to-one from Chart of Accounts) */}
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: '170px 1fr',
+                  alignItems: 'center'
+                }}>
+                  <label htmlFor="default_account_id" style={{
+                    fontSize: '16px',
+                    fontWeight: 700,
+                    color: '#0f3460'
+                  }}>
+                    Default Account *
+                  </label>
+                  <select
+                    id="default_account_id"
+                    name="default_account_id"
+                    value={formData.default_account_id}
                     onChange={handleChange}
-                    placeholder="e.g. Bank Journal, Sales Journal"
                     required
-                  />
+                    style={{
+                      ...underlineInputStyle,
+                      cursor: 'pointer',
+                      fontWeight: 600,
+                      borderBottomColor: '#0f3460'
+                    }}
+                  >
+                    <option value="">-- Select from Chart of Accounts --</option>
+                    {accounts.map(acc => (
+                      <option key={acc.id} value={acc.id}>
+                        {acc.account_name} ({acc.account_type})
+                      </option>
+                    ))}
+                  </select>
                 </div>
+
               </div>
 
-              <div className="form-group">
-                <label>Default Account *</label>
-                <select
-                  name="default_account_id"
-                  value={formData.default_account_id}
-                  onChange={handleChange}
-                  className="form-select"
-                  required
-                >
-                  <option value="">-- Select Default Account --</option>
-                  {/* Group accounts by type for easier selection.
-                      We sort accounts so they appear grouped: Asset, Equity, Expense... */}
-                  {accounts.map(acc => (
-                    <option key={acc.id} value={acc.id}>
-                      {acc.account_name} ({acc.account_type})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Accounting hint about which account to pick */}
+              {/* Wireframe Guidance Callout */}
               <div style={{
-                background: '#f8f9fa', borderRadius: '8px',
-                padding: '12px 16px', fontSize: '13px', color: '#555'
+                background: '#f8fafc',
+                borderLeft: '4px solid #0f3460',
+                borderRadius: '8px',
+                padding: '14px 18px',
+                fontSize: '13px',
+                color: '#475569',
+                lineHeight: '1.6'
               }}>
-                💡 <strong>Bank</strong> → Asset account &nbsp;|&nbsp;
-                <strong>Cash</strong> → Asset account &nbsp;|&nbsp;
-                <strong>Sale</strong> → Income account &nbsp;|&nbsp;
-                <strong>Purchase</strong> → Liability account &nbsp;|&nbsp;
-                <strong>General</strong> → Any account
+                <div style={{ fontWeight: 700, color: '#0f3460', marginBottom: '4px' }}>
+                  📌 Journal Default Account Mapping:
+                </div>
+                The Default Account specifies where debit/credit entries for this journal route automatically during financial posting (e.g. Sales → Sales Income A/c, Purchase → Purchase Expense A/c, Bank → Bank A/c, Cash → Cash A/c).
               </div>
 
-              {error && <div className="error-message">⚠️ {error}</div>}
-
-              <div className="form-actions">
-                <button type="submit" className="btn-primary" disabled={loading}>
-                  {loading ? 'Saving...' : editingId ? 'Update Journal' : 'Create Journal'}
-                </button>
-                <button type="button" className="btn-secondary" onClick={closeForm}>Cancel</button>
-              </div>
             </form>
           </div>
-        )}
-
-        <div className="card">
-          <div className="table-toolbar">
-            <span className="contact-count">
-              {filtered.length} journal{filtered.length !== 1 ? 's' : ''}
-            </span>
-            <div className="filter-tabs">
-              {['All', ...JOURNAL_TYPES].map(f => (
-                <button
-                  key={f}
-                  className={`filter-tab ${filter === f ? 'active' : ''}`}
-                  onClick={() => setFilter(f)}
-                >
-                  {f}
-                </button>
-              ))}
-            </div>
+        </div>
+      ) : (
+        /* ============================================================ */
+        /* 2. JOURNALS LIST VIEW                                        */
+        /* ============================================================ */
+        <div>
+          {/* Top Title: Journals (List View) */}
+          <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+            <h1 style={{
+              fontSize: '28px',
+              fontWeight: 800,
+              color: '#1a1a2e',
+              letterSpacing: '-0.5px',
+              margin: '0 0 6px 0'
+            }}>
+              Journals (List View)
+            </h1>
           </div>
 
-          {filtered.length === 0 ? (
-            <div className="empty-state">No journals found. Click "+ Add Journal" to create one.</div>
-          ) : (
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Type</th>
-                  <th>Journal Name</th>
-                  <th>Default Account</th>
-                  <th>Account Type</th>
-                  <th>Created</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map(journal => (
-                  <tr key={journal.id}>
-                    <td>{journal.id}</td>
-                    <td>
-                      <span className={`type-badge ${typeColor(journal.journal_type)}`}>
-                        {journal.journal_type}
-                      </span>
-                    </td>
-                    <td><strong>{journal.journal_name}</strong></td>
-                    <td>{journal.default_account?.account_name || '—'}</td>
-                    <td>
-                      {journal.default_account && (
-                        <span className={`type-badge type-${journal.default_account.account_type.toLowerCase()}`}>
-                          {journal.default_account.account_type}
-                        </span>
-                      )}
-                    </td>
-                    <td>
-                      {journal.created_at
-                        ? new Date(journal.created_at).toLocaleDateString('en-IN')
-                        : '—'}
-                    </td>
-                    <td>
-                      <div className="action-buttons">
-                        <button className="btn-edit" onClick={() => openEditForm(journal)}>Edit</button>
-                        <button className="btn-delete" onClick={() => handleDelete(journal.id, journal.journal_name)}>Delete</button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
+          {/* Main Card Frame */}
+          <div style={{
+            background: '#ffffff',
+            border: '2px solid #e2e8f0',
+            borderRadius: '24px',
+            padding: '24px 28px',
+            boxShadow: '0 10px 30px rgba(0,0,0,0.06)'
+          }}>
 
-      </div>
+            {/* Top Toolbar matching wireframe: [ New ] ... [ Back ] */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: '20px',
+              flexWrap: 'wrap',
+              gap: '12px'
+            }}>
+              {/* Left Action: [ New ] */}
+              <button
+                type="button"
+                onClick={handleNew}
+                style={{
+                  background: '#ffffff',
+                  border: '2px solid #0f3460',
+                  color: '#0f3460',
+                  fontWeight: 700,
+                  fontSize: '14px',
+                  borderRadius: '10px',
+                  padding: '7px 24px',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease'
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = '#0f3460'; e.currentTarget.style.color = '#ffffff' }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = '#ffffff'; e.currentTarget.style.color = '#0f3460' }}
+              >
+                New
+              </button>
+
+              {/* Search Box */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                background: '#f8fafc',
+                border: '1.5px solid #cbd5e1',
+                borderRadius: '10px',
+                padding: '5px 14px',
+                minWidth: '240px'
+              }}>
+                <span style={{ fontSize: '14px', color: '#64748b' }}>🔍</span>
+                <input
+                  type="text"
+                  placeholder="Search journals..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  style={{
+                    border: 'none',
+                    background: 'transparent',
+                    outline: 'none',
+                    fontSize: '13px',
+                    color: '#1e293b',
+                    width: '100%'
+                  }}
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    style={{ border: 'none', background: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '12px' }}
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+
+              {/* Right Navigation: [ Back ] */}
+              <button
+                type="button"
+                onClick={() => navigate('/dashboard')}
+                style={{
+                  background: '#ffffff',
+                  border: '2px solid #64748b',
+                  color: '#475569',
+                  fontWeight: 700,
+                  fontSize: '14px',
+                  borderRadius: '10px',
+                  padding: '7px 22px',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease'
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = '#f1f5f9' }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = '#ffffff' }}
+                title="Back to Dashboard"
+              >
+                Back
+              </button>
+            </div>
+
+            {/* Journals Table matching wireframe */}
+            {filteredJournals.length === 0 ? (
+              <div style={{
+                textAlign: 'center',
+                padding: '48px 20px',
+                color: '#64748b',
+                fontSize: '15px'
+              }}>
+                No journals found. Click <strong>"New"</strong> to create one.
+              </div>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
+                      <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: '14px', color: '#1e293b', fontWeight: 700 }}>
+                        Journal Name
+                      </th>
+                      <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: '14px', color: '#1e293b', fontWeight: 700 }}>
+                        Type
+                      </th>
+                      <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: '14px', color: '#1e293b', fontWeight: 700 }}>
+                        Default Account
+                      </th>
+                      <th style={{ textAlign: 'center', width: '110px', padding: '12px 16px', fontSize: '14px', color: '#1e293b', fontWeight: 700 }}>
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredJournals.map((journal) => {
+                      const isMaster = PRECONFIGURED_JOURNAL_NAMES.includes(journal.journal_name)
+                      return (
+                        <tr
+                          key={journal.id}
+                          onClick={() => openEditForm(journal)}
+                          style={{
+                            cursor: 'pointer',
+                            borderBottom: '1px solid #f1f5f9',
+                            transition: 'background 0.12s ease'
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'}
+                          onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                        >
+                          <td style={{ padding: '12px 16px', color: '#0f3460', fontWeight: 600, fontSize: '15px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <span>{journal.journal_name}</span>
+                              {isMaster && (
+                                <span style={{
+                                  fontSize: '10px',
+                                  fontWeight: 700,
+                                  background: '#ecfdf5',
+                                  color: '#059669',
+                                  border: '1px solid #a7f3d0',
+                                  borderRadius: '4px',
+                                  padding: '1px 6px'
+                                }}>
+                                  Master
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td style={{ padding: '12px 16px' }}>
+                            <span className={`type-badge ${typeBadgeClass(journal.journal_type)}`}>
+                              {journal.journal_type}
+                            </span>
+                          </td>
+                          <td style={{ padding: '12px 16px', color: '#dc2626', fontWeight: 600 }}>
+                            {journal.default_account?.account_name || '—'}
+                          </td>
+                          <td style={{ textAlign: 'center', padding: '12px 16px' }} onClick={(e) => e.stopPropagation()}>
+                            <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+                              <button
+                                type="button"
+                                className="btn-edit"
+                                onClick={() => openEditForm(journal)}
+                                style={{ padding: '4px 10px', fontSize: '12px' }}
+                              >
+                                Edit
+                              </button>
+                              <button
+                                type="button"
+                                className="btn-delete"
+                                onClick={(e) => handleDelete(journal.id, journal.journal_name, e)}
+                                style={{ padding: '4px 8px', fontSize: '12px' }}
+                                title="Delete journal"
+                              >
+                                🗑️
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Bottom count indicator */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginTop: '16px',
+              fontSize: '13px',
+              color: '#64748b'
+            }}>
+              <span>
+                Showing {filteredJournals.length} journal{filteredJournals.length !== 1 ? 's' : ''}
+              </span>
+            </div>
+
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }

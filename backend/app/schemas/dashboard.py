@@ -15,6 +15,15 @@ class DashboardKPIs(BaseModel):
     open_purchase_orders_count:int     = 0
     products_count:            int     = 0
     contacts_count:            int     = 0
+    sales_orders_all:          int     = 0
+    sales_orders_confirmed:    int     = 0
+    sales_orders_draft:        int     = 0
+    purchase_orders_all:       int     = 0
+    purchase_orders_confirmed: int     = 0
+    purchase_orders_draft:     int     = 0
+    budgets_total:             int     = 0
+    budgets_achieved:          int     = 0
+    budgets_committed:         int     = 0
 
 
 class MonthlyChartData(BaseModel):
@@ -45,3 +54,21 @@ class DashboardSummary(BaseModel):
     chart_data:          List[MonthlyChartData] = []
     budget_progress:     List[DepartmentBudgetProgress] = []
     recent_transactions: List[RecentTransactionItem] = []
+
+
+class CustomerDashboardSummary(BaseModel):
+    total_invoiced:      Decimal = Decimal("0.00")
+    total_paid:          Decimal = Decimal("0.00")
+    outstanding_due:     Decimal = Decimal("0.00")
+    open_invoices_count: int = 0
+    recent_invoices:     List[dict] = []
+    recent_payments:     List[dict] = []
+
+
+class VendorDashboardSummary(BaseModel):
+    total_billed:        Decimal = Decimal("0.00")
+    total_received:      Decimal = Decimal("0.00")
+    pending_balance:     Decimal = Decimal("0.00")
+    open_bills_count:    int = 0
+    recent_bills:        List[dict] = []
+    recent_payments:     List[dict] = []

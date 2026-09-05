@@ -1,5 +1,6 @@
 import time
 import re
+from typing import Optional
 
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
@@ -35,12 +36,12 @@ def create_access_token(data: dict) -> str:
 def _build_token_response(user: User) -> dict:
     # Central helper — builds the full token response dict.
     # Both login functions return this same structure.
-    # The frontend stores user_id, user_name, login_id, role
-    # directly from this response — no JWT decoding needed.
     token = create_access_token(data={
-        "sub":  user.login_id,
-        "id":   user.id,
-        "role": user.role
+        "sub":   user.login_id,
+        "id":    user.id,
+        "email": user.email,
+        "name":  user.name,
+        "role":  user.role
     })
     return {
         "access_token": token,
@@ -48,6 +49,7 @@ def _build_token_response(user: User) -> dict:
         "user_id":      user.id,
         "user_name":    user.name,
         "login_id":     user.login_id,
+        "email":        user.email,
         "role":         user.role
     }
 
@@ -85,22 +87,26 @@ def signup_user(user_data: UserSignUp, db: Session) -> User:
     if db.query(User).filter(User.email == user_data.email).first():
         raise HTTPException(status_code=400, detail="Email already registered.")
 
-    # Auto-generate a unique login_id.
-    # Strategy: take the part of email before @, keep only alphanumeric chars,
-    # take first 8 chars, append last 2 digits of current Unix timestamp.
-    # Example: "john.smith@gmail.com" → "johnsmit" + "45" → "johnsmit45"
-    email_prefix = re.sub(r'[^a-zA-Z0-9]', '', user_data.email.split('@')[0])
-    email_prefix = email_prefix[:8].lower()
-    suffix       = str(int(time.time()))[-2:]
-    login_id     = (email_prefix + suffix)[:12]
+    # If custom login_id provided by user, validate uniqueness
+    if user_data.login_id and user_data.login_id.strip():
+        login_id = user_data.login_id.strip()[:12]
+        if db.query(User).filter(User.login_id == login_id).first():
+            raise HTTPException(status_code=400, detail="Login ID already taken.")
+    else:
+        # Auto-generate a unique login_id.
+        email_prefix = re.sub(r'[^a-zA-Z0-9]', '', user_data.email.split('@')[0])
+        email_prefix = email_prefix[:8].lower()
+        suffix       = str(int(time.time()))[-2:]
+        login_id     = (email_prefix + suffix)[:12]
 
-    # Ensure generated login_id is not taken (extremely rare collision)
-    if db.query(User).filter(User.login_id == login_id).first():
-        suffix   = str(int(time.time() * 10))[-3:]
-        login_id = (email_prefix + suffix)[:12]
+        if db.query(User).filter(User.login_id == login_id).first():
+            suffix   = str(int(time.time() * 10))[-3:]
+            login_id = (email_prefix + suffix)[:12]
+
+    user_name = user_data.name or (user_data.login_id if user_data.login_id else user_data.email.split('@')[0].capitalize())
 
     new_user = User(
-        name=user_data.name,
+        name=user_name,
         login_id=login_id,
         email=user_data.email,
         password_hash=hash_password(user_data.password),
@@ -147,3 +153,16 @@ def login_by_email(email: str, password: str, db: Session) -> dict:
 
 def get_all_users(db: Session) -> list:
     return db.query(User).order_by(User.id.asc()).all()
+
+
+def update_user_profile(user_id: int, name: Optional[str], password: Optional[str], db: Session) -> User:
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+    if name and name.strip():
+        user.name = name.strip()
+    if password and password.strip():
+        user.password_hash = hash_password(password.strip())
+    db.commit()
+    db.refresh(user)
+    return user

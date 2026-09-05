@@ -56,6 +56,19 @@ def get_all_customer_invoices(db: Session) -> list:
     return db.query(CustomerInvoice).order_by(CustomerInvoice.created_at.desc()).all()
 
 
+def get_customer_invoices_for_customer(email: str, db: Session) -> list:
+    from app.models.contact import Contact
+    from sqlalchemy import func
+    return (
+        db.query(CustomerInvoice)
+        .join(SalesOrder, SalesOrder.id == CustomerInvoice.sales_order_id)
+        .join(Contact, Contact.id == SalesOrder.customer_id)
+        .filter(func.lower(Contact.email) == email.lower().strip())
+        .order_by(CustomerInvoice.created_at.desc())
+        .all()
+    )
+
+
 def get_customer_invoice_by_id(invoice_id: int, db: Session) -> CustomerInvoice:
     invoice = db.query(CustomerInvoice).filter(CustomerInvoice.id == invoice_id).first()
     if not invoice:

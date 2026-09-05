@@ -56,6 +56,20 @@ def get_all_vendor_bills(db: Session) -> list:
     return db.query(VendorBill).order_by(VendorBill.created_at.desc()).all()
 
 
+def get_vendor_bills_for_vendor(email: str, db: Session) -> list:
+    from app.models.contact import Contact
+    from app.models.purchase_order import PurchaseOrder
+    from sqlalchemy import func
+    return (
+        db.query(VendorBill)
+        .join(PurchaseOrder, PurchaseOrder.id == VendorBill.purchase_order_id)
+        .join(Contact, Contact.id == PurchaseOrder.vendor_id)
+        .filter(func.lower(Contact.email) == email.lower().strip())
+        .order_by(VendorBill.created_at.desc())
+        .all()
+    )
+
+
 def get_vendor_bill_by_id(bill_id: int, db: Session) -> VendorBill:
     bill = db.query(VendorBill).filter(VendorBill.id == bill_id).first()
     if not bill:

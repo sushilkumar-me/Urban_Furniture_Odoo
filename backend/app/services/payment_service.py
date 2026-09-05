@@ -95,6 +95,36 @@ def get_all_payments(db: Session) -> list:
     return db.query(Payment).order_by(Payment.payment_date.desc()).all()
 
 
+def get_payments_for_customer(email: str, db: Session) -> list:
+    from app.models.contact import Contact
+    from app.models.sales_order import SalesOrder
+    from sqlalchemy import func
+    return (
+        db.query(Payment)
+        .join(CustomerInvoice, CustomerInvoice.id == Payment.customer_invoice_id)
+        .join(SalesOrder, SalesOrder.id == CustomerInvoice.sales_order_id)
+        .join(Contact, Contact.id == SalesOrder.customer_id)
+        .filter(func.lower(Contact.email) == email.lower().strip())
+        .order_by(Payment.payment_date.desc())
+        .all()
+    )
+
+
+def get_payments_for_vendor(email: str, db: Session) -> list:
+    from app.models.contact import Contact
+    from app.models.purchase_order import PurchaseOrder
+    from sqlalchemy import func
+    return (
+        db.query(Payment)
+        .join(VendorBill, VendorBill.id == Payment.vendor_bill_id)
+        .join(PurchaseOrder, PurchaseOrder.id == VendorBill.purchase_order_id)
+        .join(Contact, Contact.id == PurchaseOrder.vendor_id)
+        .filter(func.lower(Contact.email) == email.lower().strip())
+        .order_by(Payment.payment_date.desc())
+        .all()
+    )
+
+
 def get_payment_by_id(payment_id: int, db: Session) -> Payment:
     payment = db.query(Payment).filter(Payment.id == payment_id).first()
     if not payment:
