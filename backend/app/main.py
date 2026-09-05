@@ -11,7 +11,7 @@ from app.dependencies import get_db
 from app.routers import (
     auth, contacts, categories, products, accounts, journals,
     analytic_accounts, budgets, purchase_orders, purchase_order_items,
-    vendor_bills, payments
+    vendor_bills, payments, sales_orders, sales_order_items, customer_invoices
 )
 
 app = FastAPI(
@@ -44,6 +44,9 @@ app.include_router(budgets.router)
 app.include_router(purchase_orders.router)
 app.include_router(purchase_order_items.router)
 app.include_router(vendor_bills.router)
+app.include_router(sales_orders.router)
+app.include_router(sales_order_items.router)
+app.include_router(customer_invoices.router)
 app.include_router(payments.router)
 
 # ---- STATIC FILES (product images) ----------------------

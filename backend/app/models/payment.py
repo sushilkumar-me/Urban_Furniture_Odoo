@@ -15,10 +15,8 @@ class Payment(Base):
     #
     # For Phase 10 (purchase workflow) we use vendor_bill_id.
     # customer_invoice_id will be used in Phase 11 (sales workflow).
-    vendor_bill_id       = Column(Integer, ForeignKey("vendor_bills.id"),       nullable=True, index=True)
-    # customer_invoice_id will be a FK in Phase 11 when customer_invoices table is built
-    # For now it is a plain integer column so the app starts without error
-    customer_invoice_id  = Column(Integer, nullable=True, index=True)
+    vendor_bill_id       = Column(Integer, ForeignKey("vendor_bills.id"), nullable=True, index=True)
+    customer_invoice_id  = Column(Integer, ForeignKey("customer_invoices.id"), nullable=True, index=True)
 
     # payment_type:
     #   'Send'    → you are PAYING money out (vendor payment)
@@ -42,3 +40,4 @@ class Payment(Base):
 
     # relationships for display
     vendor_bill          = relationship("VendorBill", lazy="joined", foreign_keys=[vendor_bill_id])
+    customer_invoice     = relationship("CustomerInvoice", lazy="joined", foreign_keys=[customer_invoice_id])

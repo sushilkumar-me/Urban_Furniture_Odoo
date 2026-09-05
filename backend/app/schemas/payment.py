@@ -13,6 +13,15 @@ class BillNested(BaseModel):
     model_config = {"from_attributes": True}
 
 
+# Nested invoice summary shown inside the payment response
+class InvoiceNested(BaseModel):
+    id:             int
+    invoice_number: str
+    total_amount:   Decimal
+    status:         str
+    model_config = {"from_attributes": True}
+
+
 class PaymentCreate(BaseModel):
     # For purchase payments: provide vendor_bill_id
     # For sales payments: provide customer_invoice_id
@@ -43,13 +52,14 @@ class PaymentUpdate(BaseModel):
 
 class PaymentResponse(BaseModel):
     id:                  int
-    vendor_bill_id:      Optional[int]    = None
-    customer_invoice_id: Optional[int]    = None
-    payment_type:        Optional[str]    = None
-    payment_method:      Optional[str]    = None
-    payment_date:        Optional[date]   = None
+    vendor_bill_id:      Optional[int]          = None
+    customer_invoice_id: Optional[int]          = None
+    payment_type:        Optional[str]          = None
+    payment_method:      Optional[str]          = None
+    payment_date:        Optional[date]         = None
     amount:              Decimal
-    note:                Optional[str]    = None
-    created_at:          Optional[datetime] = None
-    vendor_bill:         Optional[BillNested] = None
+    note:                Optional[str]          = None
+    created_at:          Optional[datetime]     = None
+    vendor_bill:         Optional[BillNested]   = None
+    customer_invoice:    Optional[InvoiceNested] = None
     model_config = {"from_attributes": True}

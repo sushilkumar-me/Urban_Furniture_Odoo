@@ -32,17 +32,19 @@ function Dashboard() {
   }
 
   const navLinks = [
-    { label: 'Dashboard',       path: '/dashboard'        },
-    { label: 'Contacts',        path: '/contacts'         },
-    { label: 'Categories',      path: '/categories'       },
-    { label: 'Products',        path: '/products'         },
-    { label: 'Accounts',        path: '/accounts'         },
-    { label: 'Journals',        path: '/journals'         },
-    { label: 'Analytics',       path: '/analytic-accounts'},
-    { label: 'Budgets',         path: '/budgets'          },
-    { label: 'Purchase Orders', path: '/purchase-orders'  },
-    { label: 'Vendor Bills',    path: '/vendor-bills'     },
-    { label: 'Payments',        path: '/payments'         },
+    { label: 'Dashboard',         path: '/dashboard'         },
+    { label: 'Contacts',          path: '/contacts'          },
+    { label: 'Categories',        path: '/categories'        },
+    { label: 'Products',          path: '/products'          },
+    { label: 'Accounts',          path: '/accounts'          },
+    { label: 'Journals',          path: '/journals'          },
+    { label: 'Analytics',         path: '/analytic-accounts' },
+    { label: 'Budgets',           path: '/budgets'           },
+    { label: 'Purchase Orders',   path: '/purchase-orders'   },
+    { label: 'Vendor Bills',      path: '/vendor-bills'      },
+    { label: 'Sales Orders',      path: '/sales-orders'      },
+    { label: 'Customer Invoices', path: '/customer-invoices' },
+    { label: 'Payments',          path: '/payments'          },
   ]
 
   return (
@@ -77,7 +79,7 @@ function Dashboard() {
 
         <h2>Dashboard</h2>
         <p className="dashboard-subtitle">
-          Welcome back. Use the navigation above to manage your accounting and purchase workflow.
+          Welcome back. Manage your enterprise accounting, procurement, and sales workflows.
         </p>
 
         <div className="stats-row">
@@ -102,6 +104,41 @@ function Dashboard() {
               <div className="stat-hint">Furniture catalogue</div>
             </div>
           </div>
+          <div className="stat-card" onClick={() => navigate('/sales-orders')} style={{ cursor: 'pointer', borderLeft: '4px solid #00aa44' }}>
+            <div className="stat-icon">🛍️</div>
+            <div className="stat-info">
+              <div className="stat-label">Sales Orders</div>
+              <div className="stat-hint">Customer quotations</div>
+            </div>
+          </div>
+          <div className="stat-card" onClick={() => navigate('/customer-invoices')} style={{ cursor: 'pointer', borderLeft: '4px solid #0055cc' }}>
+            <div className="stat-icon">📑</div>
+            <div className="stat-info">
+              <div className="stat-label">Customer Invoices</div>
+              <div className="stat-hint">Accounts receivable</div>
+            </div>
+          </div>
+          <div className="stat-card" onClick={() => navigate('/purchase-orders')} style={{ cursor: 'pointer', borderLeft: '4px solid #0f3460' }}>
+            <div className="stat-icon">📦</div>
+            <div className="stat-info">
+              <div className="stat-label">Purchase Orders</div>
+              <div className="stat-hint">Vendor procurement</div>
+            </div>
+          </div>
+          <div className="stat-card" onClick={() => navigate('/vendor-bills')} style={{ cursor: 'pointer', borderLeft: '4px solid #aa4400' }}>
+            <div className="stat-icon">🧾</div>
+            <div className="stat-info">
+              <div className="stat-label">Vendor Bills</div>
+              <div className="stat-hint">Accounts payable</div>
+            </div>
+          </div>
+          <div className="stat-card" onClick={() => navigate('/payments')} style={{ cursor: 'pointer', borderLeft: '4px solid #cc0000' }}>
+            <div className="stat-icon">💳</div>
+            <div className="stat-info">
+              <div className="stat-label">Payments & Treasury</div>
+              <div className="stat-hint">Inflows & Outflows</div>
+            </div>
+          </div>
           <div className="stat-card" onClick={() => navigate('/accounts')} style={{ cursor: 'pointer' }}>
             <div className="stat-icon">📊</div>
             <div className="stat-info">
@@ -113,7 +150,7 @@ function Dashboard() {
             <div className="stat-icon">📓</div>
             <div className="stat-info">
               <div className="stat-label">Journals</div>
-              <div className="stat-hint">Transaction categories</div>
+              <div className="stat-hint">Transaction books</div>
             </div>
           </div>
           <div className="stat-card" onClick={() => navigate('/analytic-accounts')} style={{ cursor: 'pointer' }}>
@@ -128,34 +165,6 @@ function Dashboard() {
             <div className="stat-info">
               <div className="stat-label">Budgets</div>
               <div className="stat-hint">Financial planning</div>
-            </div>
-          </div>
-          <div className="stat-card" onClick={() => navigate('/purchase-orders')} style={{ cursor: 'pointer', borderLeft: '4px solid #0f3460' }}>
-            <div className="stat-icon">📦</div>
-            <div className="stat-info">
-              <div className="stat-label">Purchase Orders</div>
-              <div className="stat-hint">Vendor procurement</div>
-            </div>
-          </div>
-          <div className="stat-card" onClick={() => navigate('/vendor-bills')} style={{ cursor: 'pointer', borderLeft: '4px solid #aa4400' }}>
-            <div className="stat-icon">🧾</div>
-            <div className="stat-info">
-              <div className="stat-label">Vendor Bills</div>
-              <div className="stat-hint">Invoices from vendors</div>
-            </div>
-          </div>
-          <div className="stat-card" onClick={() => navigate('/payments')} style={{ cursor: 'pointer', borderLeft: '4px solid #00aa44' }}>
-            <div className="stat-icon">💳</div>
-            <div className="stat-info">
-              <div className="stat-label">Payments</div>
-              <div className="stat-hint">Vendor settlements</div>
-            </div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-icon">📖</div>
-            <div className="stat-info">
-              <div className="stat-label">Journal Entries</div>
-              <div className="stat-hint">Coming soon</div>
             </div>
           </div>
         </div>

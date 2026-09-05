@@ -5,7 +5,7 @@ from typing import List
 from app.schemas.payment import PaymentCreate, PaymentUpdate, PaymentResponse
 from app.services.payment_service import (
     create_payment, get_all_payments,
-    get_payment_by_id, get_payments_by_bill,
+    get_payment_by_id, get_payments_by_bill, get_payments_by_invoice,
     update_payment, delete_payment
 )
 from app.dependencies import get_db, get_current_user, require_admin_or_accountant
@@ -23,6 +23,12 @@ def get_all(db: Session = Depends(get_db), current_user: dict = Depends(get_curr
 def get_by_bill(bill_id: int, db: Session = Depends(get_db),
                 current_user: dict = Depends(get_current_user)):
     return get_payments_by_bill(bill_id=bill_id, db=db)
+
+
+@router.get("/by-invoice/{invoice_id}", response_model=List[PaymentResponse])
+def get_by_invoice(invoice_id: int, db: Session = Depends(get_db),
+                   current_user: dict = Depends(get_current_user)):
+    return get_payments_by_invoice(invoice_id=invoice_id, db=db)
 
 
 @router.get("/{payment_id}", response_model=PaymentResponse)

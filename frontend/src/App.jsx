@@ -14,6 +14,8 @@ import AnalyticAccountsPage from './pages/AnalyticAccountsPage'
 import BudgetsPage from './pages/BudgetsPage'
 import PurchaseOrdersPage from './pages/PurchaseOrdersPage'
 import VendorBillsPage from './pages/VendorBillsPage'
+import SalesOrdersPage from './pages/SalesOrdersPage'
+import CustomerInvoicesPage from './pages/CustomerInvoicesPage'
 import PaymentsPage from './pages/PaymentsPage'
 
 function App() {
@@ -34,6 +36,8 @@ function App() {
       <Route path="/budgets"           element={<BudgetsPage />} />
       <Route path="/purchase-orders"   element={<PurchaseOrdersPage />} />
       <Route path="/vendor-bills"      element={<VendorBillsPage />} />
+      <Route path="/sales-orders"      element={<SalesOrdersPage />} />
+      <Route path="/customer-invoices" element={<CustomerInvoicesPage />} />
       <Route path="/payments"          element={<PaymentsPage />} />
       <Route path="/"           element={<Navigate to="/login" replace />} />
       <Route path="*"           element={<Navigate to="/login" replace />} />
