@@ -580,3 +580,37 @@ body {
   color: #999;
   margin-top: 2px;
 }
+
+/* ---- ACCOUNT TYPE BADGES ---- */
+.type-badge {
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  display: inline-block;
+}
+
+.type-asset {
+  background: #e6f0ff;
+  color: #0044aa;
+}
+
+.type-liability {
+  background: #fff0e6;
+  color: #aa4400;
+}
+
+.type-equity {
+  background: #f0e6ff;
+  color: #6600aa;
+}
+
+.type-income {
+  background: #e6fff0;
+  color: #006633;
+}
+
+.type-expense {
+  background: #fff0f0;
+  color: #aa0000;
+}

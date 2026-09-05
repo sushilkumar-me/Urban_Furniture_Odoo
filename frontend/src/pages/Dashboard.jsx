@@ -36,6 +36,7 @@ function Dashboard() {
     { label: 'Contacts',   path: '/contacts'   },
     { label: 'Categories', path: '/categories' },
     { label: 'Products',   path: '/products'   },
+    { label: 'Accounts',   path: '/accounts'   },
   ]
 
   return (
@@ -93,6 +94,13 @@ function Dashboard() {
             <div className="stat-info">
               <div className="stat-label">Products</div>
               <div className="stat-hint">Furniture catalogue</div>
+            </div>
+          </div>
+          <div className="stat-card" onClick={() => navigate('/accounts')} style={{ cursor: 'pointer' }}>
+            <div className="stat-icon">📊</div>
+            <div className="stat-info">
+              <div className="stat-label">Accounts</div>
+              <div className="stat-hint">Chart of accounts</div>
             </div>
           </div>
           <div className="stat-card">

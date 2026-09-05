@@ -32,6 +32,7 @@ function ProductsPage() {
     { label: 'Contacts',   path: '/contacts'   },
     { label: 'Categories', path: '/categories' },
     { label: 'Products',   path: '/products'   },
+    { label: 'Accounts',   path: '/accounts'   },
   ]
 
   const handleLogout = () => {
