@@ -17,6 +17,8 @@ import VendorBillsPage from './pages/VendorBillsPage'
 import SalesOrdersPage from './pages/SalesOrdersPage'
 import CustomerInvoicesPage from './pages/CustomerInvoicesPage'
 import PaymentsPage from './pages/PaymentsPage'
+import JournalEntriesPage from './pages/JournalEntriesPage'
+import ReportsPage from './pages/ReportsPage'
 
 function App() {
   return (
@@ -39,6 +41,8 @@ function App() {
       <Route path="/sales-orders"      element={<SalesOrdersPage />} />
       <Route path="/customer-invoices" element={<CustomerInvoicesPage />} />
       <Route path="/payments"          element={<PaymentsPage />} />
+      <Route path="/journal-entries"   element={<JournalEntriesPage />} />
+      <Route path="/reports"           element={<ReportsPage />} />
       <Route path="/"           element={<Navigate to="/login" replace />} />
       <Route path="*"           element={<Navigate to="/login" replace />} />
     </Routes>

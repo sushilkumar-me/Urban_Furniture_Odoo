@@ -45,6 +45,8 @@ function Dashboard() {
     { label: 'Sales Orders',      path: '/sales-orders'      },
     { label: 'Customer Invoices', path: '/customer-invoices' },
     { label: 'Payments',          path: '/payments'          },
+    { label: 'Journal Entries',   path: '/journal-entries'   },
+    { label: 'Reports',           path: '/reports'           },
   ]
 
   return (
@@ -137,6 +139,20 @@ function Dashboard() {
             <div className="stat-info">
               <div className="stat-label">Payments & Treasury</div>
               <div className="stat-hint">Inflows & Outflows</div>
+            </div>
+          </div>
+          <div className="stat-card" onClick={() => navigate('/journal-entries')} style={{ cursor: 'pointer', borderLeft: '4px solid #8e44ad' }}>
+            <div className="stat-icon">📖</div>
+            <div className="stat-info">
+              <div className="stat-label">Journal Entries</div>
+              <div className="stat-hint">General ledger & items</div>
+            </div>
+          </div>
+          <div className="stat-card" onClick={() => navigate('/reports')} style={{ cursor: 'pointer', borderLeft: '4px solid #00aa88' }}>
+            <div className="stat-icon">📊</div>
+            <div className="stat-info">
+              <div className="stat-label">Financial Reports</div>
+              <div className="stat-hint">P&L, Balance Sheet, Budgets</div>
             </div>
           </div>
           <div className="stat-card" onClick={() => navigate('/accounts')} style={{ cursor: 'pointer' }}>

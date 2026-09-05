@@ -19,6 +19,8 @@ const navLinks = [
   { label: 'Purchase Orders', path: '/purchase-orders'  },
   { label: 'Vendor Bills',    path: '/vendor-bills'     },
   { label: 'Payments',        path: '/payments'         },
+  { label: 'Journal Entries', path: '/journal-entries' },
+  { label: 'Reports',         path: '/reports'         },
 ]
 
 function PurchaseOrdersPage() {

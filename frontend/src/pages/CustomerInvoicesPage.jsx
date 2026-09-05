@@ -16,6 +16,8 @@ const navLinks = [
   { label: 'Sales Orders',      path: '/sales-orders'      },
   { label: 'Customer Invoices', path: '/customer-invoices' },
   { label: 'Payments',          path: '/payments'          },
+  { label: 'Journal Entries',   path: '/journal-entries'   },
+  { label: 'Reports',           path: '/reports'           },
 ]
 
 function CustomerInvoicesPage() {
