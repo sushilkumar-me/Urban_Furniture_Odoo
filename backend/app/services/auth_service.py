@@ -146,4 +146,4 @@ def login_by_email(email: str, password: str, db: Session) -> dict:
 
 
 def get_all_users(db: Session) -> list:
-    return db.query(User).all()
+    return db.query(User).order_by(User.id.asc()).all()

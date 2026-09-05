@@ -12,7 +12,7 @@ from app.routers import (
     auth, contacts, categories, products, accounts, journals,
     analytic_accounts, budgets, purchase_orders, purchase_order_items,
     vendor_bills, payments, sales_orders, sales_order_items, customer_invoices,
-    journal_entries, reports
+    journal_entries, reports, dashboard
 )
 
 app = FastAPI(
@@ -51,6 +51,7 @@ app.include_router(customer_invoices.router)
 app.include_router(payments.router)
 app.include_router(journal_entries.router)
 app.include_router(reports.router)
+app.include_router(dashboard.router)
 
 # ---- STATIC FILES (product images) ----------------------
 # StaticFiles lets FastAPI serve files from a folder directly.
