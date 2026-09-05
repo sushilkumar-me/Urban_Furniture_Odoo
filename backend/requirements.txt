@@ -1,0 +1,37 @@
+# ============================================================
+# requirements.txt
+# This file lists every external library our project needs.
+# Run: pip install -r requirements.txt
+# ============================================================
+
+# FastAPI - The web framework we use to build our API.
+# It handles HTTP requests and responses automatically.
+fastapi==0.111.0
+
+# Uvicorn - The server that RUNS our FastAPI app.
+# Think of it like the engine that powers the car (FastAPI).
+# Without uvicorn, our app cannot listen for requests.
+uvicorn==0.30.1
+
+# SQLAlchemy - The ORM (Object Relational Mapper).
+# It lets us talk to PostgreSQL using Python classes instead of raw SQL.
+# Example: instead of "SELECT * FROM invoices", we write Invoice.query.all()
+sqlalchemy==2.0.31
+
+# Psycopg2-binary - The driver that connects Python to PostgreSQL.
+# SQLAlchemy needs this to actually send commands to our database.
+# "binary" means it includes everything needed - no extra installs.
+psycopg2-binary==2.9.9
+
+# Pydantic - Used by FastAPI to validate data automatically.
+# When a user sends JSON data, pydantic checks if it is correct.
+# Example: if a field must be a number but a string is sent, it rejects it.
+pydantic==2.7.4
+
+# Python-dotenv - Reads our .env file and loads settings into the app.
+# This keeps secrets (like database passwords) out of our code.
+python-dotenv==1.0.1
+
+# Pydantic-settings - Lets us create a Settings class that reads from .env.
+# It is the bridge between pydantic and python-dotenv.
+pydantic-settings==2.3.4
