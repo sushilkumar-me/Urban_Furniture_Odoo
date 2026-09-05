@@ -34,6 +34,7 @@ function Dashboard() {
   const navLinks = [
     { label: 'Dashboard', path: '/dashboard' },
     { label: 'Contacts',  path: '/contacts'  },
+    { label: 'Categories', path: '/categories' },
   ]
 
   return (
@@ -77,6 +78,13 @@ function Dashboard() {
             <div className="stat-info">
               <div className="stat-label">Contacts</div>
               <div className="stat-hint">Customers & Vendors</div>
+            </div>
+          </div>
+          <div className="stat-card" onClick={() => navigate('/categories')} style={{ cursor: 'pointer' }}>
+            <div className="stat-icon">🗂️</div>
+            <div className="stat-info">
+              <div className="stat-label">Categories</div>
+              <div className="stat-hint">Product categories</div>
             </div>
           </div>
           <div className="stat-card">

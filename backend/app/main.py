@@ -6,7 +6,7 @@ from sqlalchemy import text
 
 from app.config import settings
 from app.dependencies import get_db
-from app.routers import auth, contacts
+from app.routers import auth, contacts, categories
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -29,6 +29,7 @@ app.add_middleware(
 
 app.include_router(auth.router)
 app.include_router(contacts.router)
+app.include_router(categories.router)
 
 @app.get("/", tags=["Health"])
 def health_check():

@@ -29,6 +29,7 @@ import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import Dashboard from './pages/Dashboard'
 import ContactsPage from './pages/ContactsPage'
+import CategoriesPage from './pages/CategoriesPage'
 
 
 function App() {
@@ -48,8 +49,9 @@ function App() {
         path="/dashboard" → when URL is /dashboard, render <Dashboard />
         This is where users land after successful login.
       */}
-      <Route path="/dashboard" element={<Dashboard />} />
-      <Route path="/contacts"  element={<ContactsPage />} />
+      <Route path="/dashboard"   element={<Dashboard />} />
+      <Route path="/contacts"    element={<ContactsPage />} />
+      <Route path="/categories"  element={<CategoriesPage />} />
 
       {/*
         path="/" → root URL

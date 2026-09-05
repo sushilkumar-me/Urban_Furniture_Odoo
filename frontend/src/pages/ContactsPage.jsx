@@ -32,6 +32,7 @@ function ContactsPage() {
   const navLinks = [
     { label: 'Dashboard', path: '/dashboard' },
     { label: 'Contacts',  path: '/contacts'  },
+    { label: 'Categories', path: '/categories' },
   ]
 
   const handleLogout = () => {
