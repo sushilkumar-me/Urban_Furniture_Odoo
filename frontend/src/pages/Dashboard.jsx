@@ -37,6 +37,7 @@ function Dashboard() {
     { label: 'Categories', path: '/categories' },
     { label: 'Products',   path: '/products'   },
     { label: 'Accounts',   path: '/accounts'   },
+    { label: 'Journals',   path: '/journals'   },
   ]
 
   return (
@@ -103,6 +104,13 @@ function Dashboard() {
               <div className="stat-hint">Chart of accounts</div>
             </div>
           </div>
+          <div className="stat-card" onClick={() => navigate('/journals')} style={{ cursor: 'pointer' }}>
+            <div className="stat-icon">📓</div>
+            <div className="stat-info">
+              <div className="stat-label">Journals</div>
+              <div className="stat-hint">Transaction categories</div>
+            </div>
+          </div>
           <div className="stat-card">
             <div className="stat-icon">🧾</div>
             <div className="stat-info">
@@ -118,9 +126,9 @@ function Dashboard() {
             </div>
           </div>
           <div className="stat-card">
-            <div className="stat-icon">📦</div>
+            <div className="stat-icon">�</div>
             <div className="stat-info">
-              <div className="stat-label">Products</div>
+              <div className="stat-label">Journal Entries</div>
               <div className="stat-hint">Coming soon</div>
             </div>
           </div>

@@ -48,6 +48,7 @@ function CategoriesPage() {
     { label: 'Categories', path: '/categories' },
     { label: 'Products',   path: '/products'   },
     { label: 'Accounts',   path: '/accounts'   },
+    { label: 'Journals',   path: '/journals'   },
   ]
 
   const handleLogout = () => {

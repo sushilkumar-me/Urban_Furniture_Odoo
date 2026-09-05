@@ -8,7 +8,7 @@ import os
 
 from app.config import settings
 from app.dependencies import get_db
-from app.routers import auth, contacts, categories, products, accounts
+from app.routers import auth, contacts, categories, products, accounts, journals
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -34,6 +34,7 @@ app.include_router(contacts.router)
 app.include_router(categories.router)
 app.include_router(products.router)
 app.include_router(accounts.router)
+app.include_router(journals.router)
 
 # ---- STATIC FILES (product images) ----------------------
 # StaticFiles lets FastAPI serve files from a folder directly.
