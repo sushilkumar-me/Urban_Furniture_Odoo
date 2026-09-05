@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Urban Furniture Accounting</title>
+  </head>
+  <body>
+    <!--
+      WHY THIS DIV EXISTS:
+      React needs ONE element in the HTML to "mount" itself into.
+      React will replace the content of this div with our components.
+      id="root" is the standard name — main.jsx looks for it.
+    -->
+    <div id="root"></div>
+
+    <!--
+      This script tag loads our React app.
+      type="module" means it uses modern ES module syntax (import/export).
+      Vite processes src/main.jsx and bundles everything the app needs.
+    -->
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

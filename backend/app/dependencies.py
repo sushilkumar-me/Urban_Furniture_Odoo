@@ -1,132 +1,119 @@
-# ============================================================
-# dependencies.py
-#
-# PURPOSE:
-#   This file contains SHARED TOOLS that any route can request.
-#   Right now we have one tool: get_db()
-#
-#   get_db() is a "dependency" — a function FastAPI calls
-#   automatically to provide a resource to a route.
-#
-# WHAT IS DEPENDENCY INJECTION?
-#   Instead of every route function creating and managing its
-#   own database session (error-prone), routes simply DECLARE
-#   "I need a database session" using Depends(get_db).
-#   FastAPI handles the rest:
-#     - calls get_db() before the route runs
-#     - passes the session to the route
-#     - closes the session after the route finishes
-#
-# HOW TO USE IN A ROUTE (example):
-#   from fastapi import APIRouter, Depends
-#   from sqlalchemy.orm import Session
-#   from app.dependencies import get_db
-#
-#   router = APIRouter()
-#
-#   @router.get("/contacts")
-#   def get_all_contacts(db: Session = Depends(get_db)):
-#       #                  ↑              ↑
-#       #               type hint     tells FastAPI to
-#       #               (for editor)  call get_db() and
-#       #                             pass the result here
-#       contacts = db.query(Contact).all()
-#       return contacts
-#
-# DEPENDENCY CHAIN:
-#   database.py (SessionLocal)
-#    └── dependencies.py (get_db uses SessionLocal)
-#         └── routers/*.py (every route uses get_db)
-# ============================================================
-
-
-# Generator: a Python function that uses "yield" instead of "return".
-# This is the standard Python pattern for managing resources that
-# need guaranteed cleanup (like files, network connections, db sessions).
-# We import the type hint here so editors and FastAPI understand
-# what type of object get_db() produces.
 from typing import Generator
 
-# Session is imported for the TYPE HINT only.
-# It tells Python (and your code editor) that get_db() yields
-# a SQLAlchemy Session object. This enables auto-complete in the editor.
-# It does NOT do anything functional by itself.
 from sqlalchemy.orm import Session
+from fastapi import Depends, HTTPException
+from fastapi.security import OAuth2PasswordBearer
+from jose import jwt, JWTError
 
-# SessionLocal is our session factory from database.py.
-# Calling SessionLocal() creates a real, live database session.
-# We import it here so get_db() can use it.
 from app.database import SessionLocal
 
+# -------------------------------------------------------
+# SECRET_KEY and ALGORITHM must match auth_service.py
+# We use these to DECODE the token the client sends.
+# -------------------------------------------------------
+SECRET_KEY = "urban_furniture_super_secret_key_2026"
+ALGORITHM  = "HS256"
 
-# ============================================================
-# get_db() — The Database Session Dependency
-# ============================================================
-#
-# This is a GENERATOR FUNCTION.
-# You know it's a generator because it uses "yield" not "return".
-#
-# How generators work with FastAPI:
-#   FastAPI is smart about generator dependencies.
-#   It runs the function UP TO the "yield" line first.
-#   Then it pauses the function and gives the yielded value
-#   to the route. After the route finishes, FastAPI resumes
-#   the generator — running the code AFTER "yield" (cleanup).
-#
-# Return type annotation:  Generator[Session, None, None]
-#   Generator[YieldType, SendType, ReturnType]
-#   YieldType  = Session  → what we yield (a db session)
-#   SendType   = None     → we don't accept sent values
-#   ReturnType = None     → generator returns nothing
-#
-#   This annotation is optional but makes the code clearer
-#   and helps your editor understand what type "db" will be.
+# OAuth2PasswordBearer tells FastAPI:
+#   "Look for a Bearer token in the Authorization header"
+#   tokenUrl="/auth/login" is the URL where tokens are issued.
+#   This makes the /docs page show an Authorize button
+#   so we can test protected endpoints directly from the browser.
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
+
+
+# ---- DATABASE SESSION DEPENDENCY -----------------------
 def get_db() -> Generator[Session, None, None]:
-
-    # --------------------------------------------------------
-    # SETUP: Create a new database session.
-    #
-    # SessionLocal() calls the factory we built in database.py.
-    # This creates a FRESH session — a private channel between
-    # this one request and the database.
-    #
-    # Each HTTP request gets its OWN session.
-    # They never share sessions with each other.
-    # This prevents one request's changes from accidentally
-    # affecting another request's data.
-    # --------------------------------------------------------
     db = SessionLocal()
-
-    # --------------------------------------------------------
-    # try / yield / finally — the safety pattern
-    #
-    # try:
-    #   Everything inside "try" is protected.
-    #   If any error occurs inside the route that uses "db",
-    #   Python catches it and jumps to "finally".
-    #
-    # yield db:
-    #   This line does two things:
-    #   1. Pauses this function
-    #   2. Sends "db" to whoever called Depends(get_db)
-    #   The route function then runs with this db session.
-    #   When the route finishes (success OR error), Python
-    #   comes back here and falls into the "finally" block.
-    #
-    # finally:
-    #   This block ALWAYS runs — no matter what happened.
-    #   Success? → finally runs.
-    #   Exception? → finally runs.
-    #   This is the GUARANTEE that the session always closes.
-    #
-    # WHY IS THIS IMPORTANT?
-    #   Every open session holds one connection from the pool.
-    #   If sessions are never closed, the pool runs out.
-    #   New requests cannot get a connection → app crashes.
-    #   finally: db.close() prevents this from ever happening.
-    # --------------------------------------------------------
     try:
-        yield db          # ← route gets the session here
-
+        yield db
     finally:
-        db.close()        # ← ALWAYS runs: session returned to pool
+        db.close()
+
+
+# ---- CURRENT USER DEPENDENCY ---------------------------
+# This function reads the JWT token from the request header,
+# decodes it, and returns the user's info as a dictionary.
+#
+# FastAPI calls this automatically when a route declares:
+#   current_user: dict = Depends(get_current_user)
+#
+# The token arrives in the Authorization header like this:
+#   Authorization: Bearer eyJhbGciOiJIUzI1NiJ9...
+#
+# OAuth2PasswordBearer extracts just the token string
+# and passes it here as the "token" parameter.
+def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
+
+    # We define the error we will raise if anything goes wrong.
+    # We define it once here so we use the same message everywhere.
+    # 401 = Unauthorized
+    # WWW-Authenticate: Bearer tells the client what auth scheme we use
+    credentials_error = HTTPException(
+        status_code=401,
+        detail="Could not validate credentials. Please log in again.",
+        headers={"WWW-Authenticate": "Bearer"}
+    )
+
+    try:
+        # jwt.decode() does three things automatically:
+        #   1. Verifies the token was signed with our SECRET_KEY
+        #      (if someone tampered with the token, this fails)
+        #   2. Checks the "exp" field — if token is expired, this fails
+        #   3. Decodes the payload and returns it as a Python dict
+        #
+        # If any check fails, JWTError is raised and we catch it below.
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+
+        # "sub" is the standard JWT field for the subject (who the token is for).
+        # We stored login_id there in create_access_token().
+        login_id: str = payload.get("sub")
+
+        # If there is no "sub" in the token, something is wrong.
+        if login_id is None:
+            raise credentials_error
+
+    except JWTError:
+        # JWTError covers: invalid signature, expired token, malformed token.
+        # In all cases we return the same 401 error — we don't tell the
+        # client WHY the token failed (security best practice).
+        raise credentials_error
+
+    # Return the user's info extracted from the token.
+    # The route function receives this as its "current_user" parameter.
+    # It contains everything we put in the token during login:
+    #   {"sub": "ADMIN001", "id": 1, "role": "Admin", "exp": ...}
+    return payload
+
+
+# ---- ROLE CHECK HELPER ---------------------------------
+# This dependency builds ON TOP of get_current_user.
+# It first gets the current user (verifies token),
+# then checks if their role is allowed to perform the action.
+#
+# Usage in a router:
+#   def create(..., current_user: dict = Depends(require_admin_or_accountant)):
+#
+# Allowed roles: Admin and Accountant
+# Blocked roles: Customer
+#
+# WHY block Customer?
+#   Customers should not be able to create, edit, or delete
+#   contacts in the company's accounting system.
+#   Only internal staff (Admin and Accountant) should do that.
+def require_admin_or_accountant(
+    current_user: dict = Depends(get_current_user)
+) -> dict:
+
+    # Extract the role from the decoded token payload
+    role = current_user.get("role")
+
+    # Check if the role is in the allowed list
+    if role not in ["Admin", "Accountant"]:
+        raise HTTPException(
+            status_code=403,   # 403 = Forbidden (you are logged in but not allowed)
+            detail=f"Access denied. Required role: Admin or Accountant. Your role: {role}"
+        )
+
+    # If role is allowed, return the user so the route can use it if needed
+    return current_user
