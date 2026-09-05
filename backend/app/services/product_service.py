@@ -140,7 +140,7 @@ def update_product(product_id: int, data: ProductUpdate, db: Session) -> Product
 
     # Only include fields the client actually sent
     update_data = data.model_dump(exclude_unset=True)
-
+    print(update_data)
     # If category_id is being changed, validate the new category exists
     if "category_id" in update_data:
         category = db.query(Category).filter(

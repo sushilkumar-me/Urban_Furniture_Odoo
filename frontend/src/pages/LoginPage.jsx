@@ -4,7 +4,7 @@ import api from '../api'
 
 function LoginPage() {
 
-  const [formData, setFormData] = useState({ login_id: '', password: '' })
+  const [formData, setFormData] = useState({ email: '', password: '' })
   const [error, setError]       = useState('')
   const [loading, setLoading]   = useState(false)
   const navigate                = useNavigate()
@@ -17,11 +17,30 @@ function LoginPage() {
     e.preventDefault()
     setError('')
     setLoading(true)
+
     try {
-      const response = await api.post('/auth/login', formData)
-      localStorage.setItem('token', response.data.access_token)
-      localStorage.setItem('login_id', formData.login_id)
-      navigate('/dashboard')
+      // POST /auth/login-by-email accepts email + password
+      // Response includes: access_token, role, user_id, user_name, login_id
+      const response = await api.post('/auth/login-by-email', formData)
+      const data     = response.data
+
+      // Store everything the app needs in localStorage
+      // The token is used by the axios interceptor for all future requests
+      localStorage.setItem('token',     data.access_token)
+      localStorage.setItem('login_id',  data.login_id)
+      localStorage.setItem('user_name', data.user_name)
+      localStorage.setItem('user_id',   String(data.user_id))
+      localStorage.setItem('role',      data.role)
+
+      // Role-based redirect:
+      //   Admin and Accountant → main accounting dashboard
+      //   Customer             → customer dashboard (simpler view)
+      if (data.role === 'Admin' || data.role === 'Accountant') {
+        navigate('/dashboard')
+      } else {
+        navigate('/customer-dashboard')
+      }
+
     } catch (err) {
       if (err.response?.data?.detail) {
         setError(err.response.data.detail)
@@ -36,6 +55,7 @@ function LoginPage() {
   return (
     <div className="login-container">
       <div className="login-card">
+
         <div className="login-header">
           <h1>🪑 Urban Furniture</h1>
           <h2>Accounting System</h2>
@@ -43,17 +63,18 @@ function LoginPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="login-form">
+
           <div className="form-group">
-            <label htmlFor="login_id">Login ID</label>
+            <label htmlFor="email">Email Address</label>
             <input
-              type="text"
-              id="login_id"
-              name="login_id"
-              value={formData.login_id}
+              type="email"
+              id="email"
+              name="email"
+              value={formData.email}
               onChange={handleChange}
-              placeholder="Enter your Login ID (e.g. ADMIN001)"
+              placeholder="Enter your email address"
               required
-              autoComplete="username"
+              autoComplete="email"
             />
           </div>
 
@@ -76,21 +97,31 @@ function LoginPage() {
           <button type="submit" className="login-button" disabled={loading}>
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
+
         </form>
 
         <div className="login-hint">
-          <p>Demo credentials:</p>
-          <p>Login ID: <strong>ADMIN001</strong> | Password: <strong>admin@1234</strong></p>
-          <p style={{ marginTop: '10px' }}>
-            No account?{' '}
+          <p>
+            Don't have an account?{' '}
             <span
-              onClick={() => navigate('/register')}
+              onClick={() => navigate('/signup')}
               style={{ color: '#0f3460', fontWeight: 600, cursor: 'pointer' }}
             >
-              Create Account
+              Sign Up
             </span>
           </p>
+          <p style={{ marginTop: '8px', fontSize: '12px', color: '#aaa' }}>
+            Admin? Use{' '}
+            <span
+              onClick={() => navigate('/register')}
+              style={{ color: '#999', cursor: 'pointer', textDecoration: 'underline' }}
+            >
+              Create User
+            </span>
+            {' '}to add staff accounts.
+          </p>
         </div>
+
       </div>
     </div>
   )

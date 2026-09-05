@@ -34,6 +34,8 @@ function ProductsPage() {
     { label: 'Products',   path: '/products'   },
     { label: 'Accounts',   path: '/accounts'   },
     { label: 'Journals',   path: '/journals'   },
+    { label: 'Analytics',  path: '/analytic-accounts' },
+    { label: 'Budgets',    path: '/budgets'    },
   ]
 
   const handleLogout = () => {
