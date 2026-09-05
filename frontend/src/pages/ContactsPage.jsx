@@ -30,9 +30,10 @@ function ContactsPage() {
   const loginId  = localStorage.getItem('login_id') || 'User'
 
   const navLinks = [
-    { label: 'Dashboard', path: '/dashboard' },
-    { label: 'Contacts',  path: '/contacts'  },
+    { label: 'Dashboard',  path: '/dashboard'  },
+    { label: 'Contacts',   path: '/contacts'   },
     { label: 'Categories', path: '/categories' },
+    { label: 'Products',   path: '/products'   },
   ]
 
   const handleLogout = () => {

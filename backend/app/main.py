@@ -1,12 +1,14 @@
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from sqlalchemy import text
+import os
 
 from app.config import settings
 from app.dependencies import get_db
-from app.routers import auth, contacts, categories
+from app.routers import auth, contacts, categories, products
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -30,6 +32,29 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(contacts.router)
 app.include_router(categories.router)
+app.include_router(products.router)
+
+# ---- STATIC FILES (product images) ----------------------
+# StaticFiles lets FastAPI serve files from a folder directly.
+#
+# mount() attaches a static file handler to a URL path.
+#   "/uploads"    → the URL prefix browsers use to request images
+#   StaticFiles() → the handler that reads files from disk
+#   directory     → the folder on disk to serve files from
+#   name="uploads"→ an internal name FastAPI uses for this mount
+#
+# How it works end-to-end:
+#   1. Admin uploads sofa.jpg → saved as "1725432345.jpg" in uploads/
+#   2. DB stores: product.image = "1725432345.jpg"
+#   3. React builds: http://localhost:8000/uploads/1725432345.jpg
+#   4. Browser requests that URL → FastAPI finds the file → returns it
+#
+# UPLOAD_PATH: we build an absolute path to backend/uploads/
+# os.path.dirname(__file__) → directory of main.py = backend/app/
+# os.path.join(..., "..", "uploads") → go up one level to backend/,
+#                                       then into uploads/
+UPLOAD_PATH = os.path.join(os.path.dirname(__file__), "..", "uploads")
+app.mount("/uploads", StaticFiles(directory=UPLOAD_PATH), name="uploads")
 
 @app.get("/", tags=["Health"])
 def health_check():

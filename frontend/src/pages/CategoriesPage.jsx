@@ -43,9 +43,10 @@ function CategoriesPage() {
   // navLinks: the navigation menu items
   // Adding Categories here so the nav bar stays consistent
   const navLinks = [
-    { label: 'Dashboard',   path: '/dashboard'   },
-    { label: 'Contacts',    path: '/contacts'    },
-    { label: 'Categories',  path: '/categories'  },
+    { label: 'Dashboard',  path: '/dashboard'  },
+    { label: 'Contacts',   path: '/contacts'   },
+    { label: 'Categories', path: '/categories' },
+    { label: 'Products',   path: '/products'   },
   ]
 
   const handleLogout = () => {
