@@ -19,4 +19,4 @@ class SalesOrder(Base):
     # Relationships
     customer = relationship("Contact", lazy="joined", foreign_keys=[customer_id])
     creator  = relationship("User",    lazy="joined", foreign_keys=[created_by])
-    items    = relationship("SalesOrderItem", back_populates="sales_order", lazy="select")
+    items    = relationship("SalesOrderItem", back_populates="sales_order", lazy="select", cascade="all, delete-orphan")

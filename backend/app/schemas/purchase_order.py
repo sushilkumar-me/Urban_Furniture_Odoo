@@ -67,8 +67,12 @@ class PurchaseOrderCreate(BaseModel):
 
 
 class PurchaseOrderUpdate(BaseModel):
-    status:       Optional[str]   = None
-    total_amount: Optional[float] = None
+    vendor_id:    Optional[int]                = None
+    po_number:    Optional[str]                = None
+    po_date:      Optional[date]               = None
+    status:       Optional[str]                = None
+    total_amount: Optional[float]              = None
+    items:        Optional[List[POItemCreate]] = None
 
 
 class PurchaseOrderResponse(BaseModel):

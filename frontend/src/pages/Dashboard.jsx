@@ -178,7 +178,7 @@ function Dashboard() {
               Sales
             </h2>
             <button
-              onClick={() => navigate('/sales-orders')}
+              onClick={() => navigate('/sales-orders?new=true')}
               style={{
                 background: '#1a4971',
                 color: '#ffffff',
@@ -201,13 +201,13 @@ function Dashboard() {
           {/* 3 Metric Badges: All | Confirmed | Draft */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
             {[
-              { label: 'All',       val: kpis.sales_orders_all || 0,       filter: '' },
-              { label: 'Confirmed', val: kpis.sales_orders_confirmed || 0, filter: 'Confirmed' },
-              { label: 'Draft',     val: kpis.sales_orders_draft || 0,     filter: 'Draft' }
+              { label: 'All',       val: kpis.sales_orders_all || 0,       status: 'All' },
+              { label: 'Confirmed', val: kpis.sales_orders_confirmed || 0, status: 'Confirmed' },
+              { label: 'Draft',     val: kpis.sales_orders_draft || 0,     status: 'Draft' }
             ].map((badge) => (
               <div
                 key={badge.label}
-                onClick={() => navigate('/sales-orders')}
+                onClick={() => navigate(`/sales-orders?status=${badge.status}`)}
                 style={{
                   border: '2px solid #cbd5e1',
                   borderRadius: '14px',
@@ -253,7 +253,7 @@ function Dashboard() {
               Purchase
             </h2>
             <button
-              onClick={() => navigate('/purchase-orders')}
+              onClick={() => navigate('/purchase-orders?new=true')}
               style={{
                 background: '#1a4971',
                 color: '#ffffff',
@@ -276,13 +276,13 @@ function Dashboard() {
           {/* 3 Metric Badges: All | Confirmed | Draft */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
             {[
-              { label: 'All',       val: kpis.purchase_orders_all || 0,       filter: '' },
-              { label: 'Confirmed', val: kpis.purchase_orders_confirmed || 0, filter: 'Confirmed' },
-              { label: 'Draft',     val: kpis.purchase_orders_draft || 0,     filter: 'Draft' }
+              { label: 'All',       val: kpis.purchase_orders_all || 0,       status: 'All' },
+              { label: 'Confirmed', val: kpis.purchase_orders_confirmed || 0, status: 'Confirmed' },
+              { label: 'Draft',     val: kpis.purchase_orders_draft || 0,     status: 'Draft' }
             ].map((badge) => (
               <div
                 key={badge.label}
-                onClick={() => navigate('/purchase-orders')}
+                onClick={() => navigate(`/purchase-orders?status=${badge.status}`)}
                 style={{
                   border: '2px solid #cbd5e1',
                   borderRadius: '14px',
@@ -327,7 +327,7 @@ function Dashboard() {
               Budget Reports
             </h2>
             <button
-              onClick={() => navigate('/reports')}
+              onClick={() => navigate('/reports?tab=budget')}
               style={{
                 background: '#1a4971',
                 color: '#ffffff',

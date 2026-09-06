@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import api from '../api'
 
 const todayStr = () => new Date().toISOString().split('T')[0]
@@ -29,10 +29,11 @@ function SalesOrdersPage() {
   const [loading, setLoading]         = useState(false)
 
   const navigate = useNavigate()
+  const location = useLocation()
 
   useEffect(() => {
     fetchInitialData()
-  }, [])
+  }, [location.search])
 
   const fetchInitialData = async () => {
     try {
@@ -46,6 +47,34 @@ function SalesOrdersPage() {
       setCustomers(contactRes.data)
       setProducts(prodRes.data)
       setAnalytics(anaRes.data)
+
+      const params = new URLSearchParams(location.search)
+      const statusParam = params.get('status')
+      const isNew = params.get('new')
+
+      if (statusParam) {
+        setFilterStatus(statusParam)
+        setShowForm(false)
+      }
+      if (isNew === 'true') {
+        const nextSeq = soRes.data.length + 1
+        setFormData({
+          customer_id: contactRes.data.length > 0 ? String(contactRes.data[0].id) : '',
+          so_number:   `SO${String(nextSeq).padStart(5, '0')}`,
+          so_date:     todayStr(),
+          status:      'Draft',
+          items: [
+            {
+              product_id: prodRes.data.length > 0 ? String(prodRes.data[0].id) : '',
+              analytic_account_id: anaRes.data.length > 0 ? String(anaRes.data[0].id) : '',
+              quantity: 1,
+              unit_price: prodRes.data.length > 0 ? String(prodRes.data[0].sales_price || 0) : ''
+            }
+          ]
+        })
+        setEditingId(null)
+        setShowForm(true)
+      }
     } catch {
       setError('Failed to load sales orders data.')
     }
@@ -91,7 +120,7 @@ function SalesOrdersPage() {
     setFormData({
       customer_id: String(so.customer_id),
       so_number:   so.so_number,
-      so_date:     so.so_date || todayStr(),
+      so_date:     so.so_date ? String(so.so_date).split('T')[0] : todayStr(),
       status:      so.status || 'Draft',
       items: so.items && so.items.length > 0
         ? so.items.map(it => ({
@@ -229,9 +258,10 @@ function SalesOrdersPage() {
       return
     }
 
+    const currentUserId = Number(localStorage.getItem('user_id')) || 49
     const payload = {
       customer_id: Number(formData.customer_id),
-      created_by:  1, // Default admin
+      created_by:  currentUserId,
       so_number:   formData.so_number.trim(),
       so_date:     formData.so_date,
       items: formData.items.map(it => ({
@@ -244,6 +274,7 @@ function SalesOrdersPage() {
 
     try {
       if (editingId) {
+        await api.put(`/sales-orders/${editingId}`, payload)
         if (overrideStatus) {
           await api.patch(`/sales-orders/${editingId}/status`, { status: overrideStatus })
         }

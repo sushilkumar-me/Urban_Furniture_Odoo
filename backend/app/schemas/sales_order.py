@@ -33,8 +33,12 @@ class SalesOrderCreate(BaseModel):
 
 
 class SalesOrderUpdate(BaseModel):
-    status:       Optional[str]   = None
-    total_amount: Optional[float] = None
+    customer_id:  Optional[int]                = None
+    so_number:    Optional[str]                = None
+    so_date:      Optional[date]               = None
+    status:       Optional[str]                = None
+    total_amount: Optional[float]              = None
+    items:        Optional[List[SOItemCreate]] = None
 
 
 class SalesOrderResponse(BaseModel):

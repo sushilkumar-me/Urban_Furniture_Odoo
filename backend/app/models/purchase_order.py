@@ -44,4 +44,4 @@ class PurchaseOrder(Base):
     # items: loads all line items for this PO
     # lazy="select" means items are loaded separately when accessed
     # This avoids loading all items for every PO in a list query
-    items         = relationship("PurchaseOrderItem", back_populates="purchase_order", lazy="select")
+    items         = relationship("PurchaseOrderItem", back_populates="purchase_order", lazy="select", cascade="all, delete-orphan")

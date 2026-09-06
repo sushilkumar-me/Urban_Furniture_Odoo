@@ -7,6 +7,7 @@ from app.models.sales_order import SalesOrder
 from app.models.sales_order_item import SalesOrderItem
 from app.models.contact import Contact
 from app.models.product import Product
+from app.models.user import User
 from app.schemas.sales_order import SalesOrderCreate, SalesOrderUpdate
 
 SO_STATUSES = {"Draft", "Confirmed", "Cancelled"}
@@ -39,10 +40,18 @@ def create_sales_order(data: SalesOrderCreate, db: Session) -> SalesOrder:
     if not data.items:
         raise HTTPException(status_code=400, detail="Sales order must have at least one item.")
 
+    # Validate created_by user exists, fallback safely to an existing admin
+    creator = db.query(User).filter(User.id == data.created_by).first()
+    if not creator:
+        first_admin = db.query(User).filter(User.role == "Admin").first() or db.query(User).first()
+        creator_id = first_admin.id if first_admin else data.created_by
+    else:
+        creator_id = data.created_by
+
     # Create the SO header first
     new_so = SalesOrder(
         customer_id=data.customer_id,
-        created_by=data.created_by,
+        created_by=creator_id,
         so_number=data.so_number,
         so_date=data.so_date,
         status="Draft",
@@ -91,24 +100,53 @@ def get_sales_order_by_id(so_id: int, db: Session) -> SalesOrder:
     return so
 
 
-def update_sales_order_status(so_id: int, data: SalesOrderUpdate, db: Session) -> SalesOrder:
+def update_sales_order(so_id: int, data: SalesOrderUpdate, db: Session) -> SalesOrder:
+    from app.models.sales_order_item import SalesOrderItem
     so = get_sales_order_by_id(so_id, db)
-    update_data = data.model_dump(exclude_unset=True)
 
-    if "status" in update_data:
-        if update_data["status"] not in SO_STATUSES:
+    if data.customer_id is not None:
+        so.customer_id = data.customer_id
+    if data.so_number is not None and data.so_number.strip():
+        existing_so = db.query(SalesOrder).filter(SalesOrder.so_number == data.so_number.strip(), SalesOrder.id != so.id).first()
+        if existing_so:
+            raise HTTPException(status_code=400, detail=f"Sales Order number '{data.so_number}' already exists.")
+        so.so_number = data.so_number.strip()
+    if data.so_date is not None:
+        so.so_date = data.so_date
+    if data.status is not None:
+        if data.status not in SO_STATUSES:
             raise HTTPException(status_code=400, detail=f"status must be one of: {', '.join(SO_STATUSES)}")
-
-        # Cannot reactivate a cancelled SO
-        if so.status == "Cancelled" and update_data["status"] != "Cancelled":
+        if so.status == "Cancelled" and data.status != "Cancelled":
             raise HTTPException(status_code=400, detail="Cannot reactivate a cancelled sales order.")
+        so.status = data.status
 
-    for key, value in update_data.items():
-        setattr(so, key, value)
+    if data.items is not None:
+        so.items.clear()
+        db.flush()
+        running_total = Decimal("0.00")
+        for item_data in data.items:
+            line_total = Decimal(str(item_data.quantity)) * Decimal(str(item_data.unit_price))
+            running_total += line_total
+            so_item = SalesOrderItem(
+                sales_order_id=so.id,
+                product_id=item_data.product_id,
+                analytic_account_id=item_data.analytic_account_id,
+                quantity=item_data.quantity,
+                unit_price=item_data.unit_price,
+                total=line_total
+            )
+            so.items.append(so_item)
+        so.total_amount = running_total
+    elif data.total_amount is not None:
+        so.total_amount = Decimal(str(data.total_amount))
 
     db.commit()
     db.refresh(so)
     return so
+
+
+def update_sales_order_status(so_id: int, data: SalesOrderUpdate, db: Session) -> SalesOrder:
+    return update_sales_order(so_id=so_id, data=data, db=db)
 
 
 def delete_sales_order(so_id: int, db: Session) -> dict:

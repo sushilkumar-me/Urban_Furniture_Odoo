@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import api from '../api'
 
 function ReportsPage() {
@@ -25,6 +25,15 @@ function ReportsPage() {
   const [selectedAnalytic, setSelectedAnalytic] = useState('All')
 
   const navigate = useNavigate()
+  const location = useLocation()
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    const tabParam = params.get('tab')
+    if (tabParam && ['pnl', 'bs', 'budget'].includes(tabParam)) {
+      setActiveTab(tabParam)
+    }
+  }, [location.search])
 
   useEffect(() => {
     fetchAnalytics()

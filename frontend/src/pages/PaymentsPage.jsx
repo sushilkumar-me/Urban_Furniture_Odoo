@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import api from '../api'
+import { downloadPaymentVoucher } from '../utils/voucherGenerator'
 
 const todayStr = () => new Date().toISOString().split('T')[0]
 
@@ -174,13 +175,30 @@ function PaymentsPage() {
     }
 
     try {
-      await api.post('/payments/', payload)
+      const res = await api.post('/payments/', payload)
+      const createdPayment = res.data
       setPipelineStatus('Confirm')
-      setSuccess(`Payment of ₹${Number(amount).toLocaleString('en-IN')} confirmed and posted to Treasury & General Ledger!`)
+      setSuccess(`Payment of ₹${Number(amount).toLocaleString('en-IN')} confirmed and posted to Treasury & General Ledger! Downloading voucher...`)
+
+      const docRef = paymentType === 'Send'
+        ? (bills.find(b => String(b.id) === selectedDocId)?.bill_number || (selectedDocId ? `Bill #${selectedDocId}` : 'Direct Settlement'))
+        : (invoices.find(i => String(i.id) === selectedDocId)?.invoice_number || (selectedDocId ? `Invoice #${selectedDocId}` : 'Direct Receipt'))
+
+      downloadPaymentVoucher({
+        voucherNo:     `VOUCH-PAY-${String(createdPayment?.id || Date.now().toString().slice(-4)).padStart(4, '0')}`,
+        paymentType:   paymentType,
+        paymentDate:   paymentDate,
+        paymentMethod: paymentVia === 'Bank' ? 'Bank Transfer' : 'Cash',
+        partnerName:   partnerName || (paymentType === 'Send' ? 'Vendor' : 'Customer'),
+        documentRef:   docRef,
+        amount:        Number(amount),
+        note:          note
+      })
+
       await fetchAll()
       setTimeout(() => {
         setShowForm(false)
-      }, 1200)
+      }, 1500)
     } catch (err) {
       const detail = err.response?.data?.detail
       if (Array.isArray(detail)) {
@@ -936,22 +954,52 @@ function PaymentsPage() {
                             </span>
                           </td>
                           <td style={{ padding: '12px 14px', textAlign: 'center' }}>
-                            <button
-                              onClick={(e) => handleDelete(p, e)}
-                              style={{
-                                background: '#fff1f2',
-                                border: '1px solid #fecdd3',
-                                color: '#e11d48',
-                                borderRadius: '6px',
-                                padding: '4px 8px',
-                                fontSize: '12px',
-                                fontWeight: 600,
-                                cursor: 'pointer'
-                              }}
-                              title="Delete Payment Record"
-                            >
-                              🗑️
-                            </button>
+                            <div style={{ display: 'flex', gap: '6px', justifyContent: 'center', alignItems: 'center' }}>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  downloadPaymentVoucher({
+                                    voucherNo:     `VOUCH-PAY-${String(p.id).padStart(4, '0')}`,
+                                    paymentType:   p.payment_type,
+                                    paymentDate:   p.payment_date,
+                                    paymentMethod: p.payment_method || 'Bank Transfer',
+                                    partnerName:   partner,
+                                    documentRef:   docNumber,
+                                    amount:        Number(p.amount),
+                                    note:          p.note || ''
+                                  })
+                                }}
+                                style={{
+                                  background: '#ecfdf5',
+                                  border: '1px solid #10b981',
+                                  color: '#047857',
+                                  padding: '4px 8px',
+                                  fontSize: '12px',
+                                  borderRadius: '6px',
+                                  cursor: 'pointer',
+                                  fontWeight: 600
+                                }}
+                                title="Download Payment Voucher"
+                              >
+                                📥 Voucher
+                              </button>
+                              <button
+                                onClick={(e) => handleDelete(p, e)}
+                                style={{
+                                  background: '#fff1f2',
+                                  border: '1px solid #fecdd3',
+                                  color: '#e11d48',
+                                  borderRadius: '6px',
+                                  padding: '4px 8px',
+                                  fontSize: '12px',
+                                  fontWeight: 600,
+                                  cursor: 'pointer'
+                                }}
+                                title="Delete Payment"
+                              >
+                                🗑️
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       )

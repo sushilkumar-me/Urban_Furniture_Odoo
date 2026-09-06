@@ -5,7 +5,7 @@ from typing import List
 from app.schemas.sales_order import SalesOrderCreate, SalesOrderUpdate, SalesOrderResponse
 from app.services.sales_order_service import (
     create_sales_order, get_all_sales_orders,
-    get_sales_order_by_id, update_sales_order_status, delete_sales_order
+    get_sales_order_by_id, update_sales_order, update_sales_order_status, delete_sales_order
 )
 from app.dependencies import get_db, get_current_user, require_admin_or_accountant
 
@@ -26,6 +26,13 @@ def get_one(so_id: int, db: Session = Depends(get_db), current_user: dict = Depe
 def create(data: SalesOrderCreate, db: Session = Depends(get_db),
            current_user: dict = Depends(require_admin_or_accountant)):
     return create_sales_order(data=data, db=db)
+
+
+@router.put("/{so_id}", response_model=SalesOrderResponse)
+@router.patch("/{so_id}", response_model=SalesOrderResponse)
+def update(so_id: int, data: SalesOrderUpdate, db: Session = Depends(get_db),
+           current_user: dict = Depends(require_admin_or_accountant)):
+    return update_sales_order(so_id=so_id, data=data, db=db)
 
 
 @router.patch("/{so_id}/status", response_model=SalesOrderResponse)

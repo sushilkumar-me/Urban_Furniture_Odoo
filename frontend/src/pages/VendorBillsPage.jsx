@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import api from '../api'
+import { downloadPaymentVoucher } from '../utils/voucherGenerator'
 
 const todayStr = () => new Date().toISOString().split('T')[0]
 
@@ -32,6 +33,18 @@ function VendorBillsPage() {
   const [success, setSuccess]         = useState('')
   const [loading, setLoading]         = useState(false)
 
+  // Bill Payment Modal State (Matching Excalidraw Wireframe)
+  const [showPayModal, setShowPayModal]       = useState(false)
+  const [payPaymentType, setPayPaymentType]   = useState('Send')
+  const [payPartner, setPayPartner]           = useState('')
+  const [payAmount, setPayAmount]             = useState('')
+  const [payDate, setPayDate]                 = useState(todayStr())
+  const [payVia, setPayVia]                   = useState('Bank Transfer')
+  const [payNote, setPayNote]                 = useState('')
+  const [payStatus, setPayStatus]             = useState('Draft')
+  const [payLoading, setPayLoading]           = useState(false)
+  const [showPayGearMenu, setShowPayGearMenu] = useState(false)
+
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -60,7 +73,7 @@ function VendorBillsPage() {
       if (targetPoId) {
         const po = poRes.data.find(p => String(p.id) === String(targetPoId))
         if (po) {
-          handlePrefillFromPO(po, bRes.data.length)
+          handlePrefillFromPO(po, bRes.data.length, bRes.data)
         }
       }
     } catch {
@@ -82,7 +95,15 @@ function VendorBillsPage() {
     return `Bill/2026/${String(nextSeq).padStart(4, '0')}`
   }
 
-  const handlePrefillFromPO = (po, count) => {
+  const handlePrefillFromPO = (po, count, allBills = null) => {
+    const billList = allBills || bills
+    const existingBill = billList.find(b => Number(b.purchase_order_id) === Number(po.id))
+    if (existingBill) {
+      openEditForm(existingBill)
+      setSuccess(`Opened existing Vendor Bill "${existingBill.bill_number}" for PO ${po.po_number}.`)
+      return
+    }
+
     setSelectedPO(po)
     setFormData({
       purchase_order_id: String(po.id),
@@ -100,9 +121,10 @@ function VendorBillsPage() {
   }
 
   const handleNew = () => {
-    const firstPO = pos.find(p => p.status === 'Confirmed') || pos[0]
-    if (firstPO) {
-      handlePrefillFromPO(firstPO, bills.length)
+    const billedPoIds = new Set(bills.map(b => Number(b.purchase_order_id)))
+    const unbilledPO = pos.find(p => p.status === 'Confirmed' && !billedPoIds.has(Number(p.id))) || pos.find(p => !billedPoIds.has(Number(p.id)))
+    if (unbilledPO) {
+      handlePrefillFromPO(unbilledPO, bills.length)
     } else {
       setFormData({
         ...emptyForm,
@@ -150,12 +172,19 @@ function VendorBillsPage() {
   const handleHeaderChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value })
     if (e.target.name === 'purchase_order_id' && e.target.value) {
+      const existingBill = bills.find(b => String(b.purchase_order_id) === e.target.value)
+      if (existingBill && existingBill.id !== editingId) {
+        openEditForm(existingBill)
+        setSuccess(`Opened existing Vendor Bill "${existingBill.bill_number}" for this Purchase Order.`)
+        return
+      }
       const po = pos.find(p => String(p.id) === e.target.value)
       if (po) {
         setSelectedPO(po)
         setFormData(prev => ({
           ...prev,
           purchase_order_id: String(po.id),
+          bill_reference:    `PO-REF-${po.po_number}`,
           vendor_name:       po.vendor?.name || '',
           total_amount:      Number(po.total_amount) || 0
         }))
@@ -197,8 +226,20 @@ function VendorBillsPage() {
         })
         setSuccess(`Vendor Bill "${formData.bill_number}" updated.`)
       } else {
-        await api.post('/vendor-bills/', payload)
-        setSuccess(`Vendor Bill "${formData.bill_number}" created successfully.`)
+        // If a bill already exists for this PO, update it instead of throwing duplicate error
+        const existingBill = bills.find(b => Number(b.purchase_order_id) === Number(formData.purchase_order_id))
+        if (existingBill) {
+          setEditingId(existingBill.id)
+          await api.patch(`/vendor-bills/${existingBill.id}`, {
+            bill_number: formData.bill_number.trim(),
+            bill_date:   formData.bill_date,
+            due_date:    formData.due_date || null
+          })
+          setSuccess(`Updated existing Vendor Bill "${formData.bill_number}".`)
+        } else {
+          await api.post('/vendor-bills/', payload)
+          setSuccess(`Vendor Bill "${formData.bill_number}" created successfully.`)
+        }
       }
       await fetchBills()
       closeForm()
@@ -219,13 +260,39 @@ function VendorBillsPage() {
   }
 
   const handleConfirmBill = async () => {
-    if (!editingId) {
-      await handleSubmit()
-      return
+    let billIdToConfirm = editingId
+    if (!billIdToConfirm) {
+      const existingBill = bills.find(b => Number(b.purchase_order_id) === Number(formData.purchase_order_id))
+      if (existingBill) {
+        billIdToConfirm = existingBill.id
+        setEditingId(existingBill.id)
+      } else {
+        if (!formData.purchase_order_id) {
+          setError('Please select a Purchase Order first.')
+          return
+        }
+        try {
+          setLoading(true)
+          const res = await api.post('/vendor-bills/', {
+            purchase_order_id: Number(formData.purchase_order_id),
+            bill_number:       formData.bill_number.trim() || `BILL-AUTO-${Date.now().toString().slice(-4)}`,
+            bill_date:         formData.bill_date || todayStr(),
+            due_date:          formData.due_date || null,
+            total_amount:      Number(formData.total_amount)
+          })
+          billIdToConfirm = res.data.id
+          setEditingId(res.data.id)
+        } catch (err) {
+          setError(err.response?.data?.detail || 'Failed to create vendor bill.')
+          setLoading(false)
+          return
+        }
+      }
     }
+
     try {
       setLoading(true)
-      await api.patch(`/vendor-bills/${editingId}`, { status: 'Posted' })
+      await api.patch(`/vendor-bills/${billIdToConfirm}`, { status: 'Posted' })
       setSuccess(`Vendor Bill "${formData.bill_number}" Confirmed & Posted to General Ledger!`)
       setFormData(prev => ({ ...prev, status: 'Not Paid' }))
       await fetchBills()
@@ -255,10 +322,104 @@ function VendorBillsPage() {
     }
   }
 
-  // [ Pay ] -> Opens Bill Payment screen prefilling bill details
+  // [ Pay ] -> Opens Bill Payment Modal showing Payment Type, Partner, Payment Via, Amount, Date, etc.
   const handlePayBill = () => {
-    if (!editingId) return
-    navigate(`/payments?bill_id=${editingId}`)
+    if (!editingId) {
+      setError('Please save or confirm the vendor bill first.')
+      return
+    }
+    const amt = Number(formData.total_amount || 0)
+    setPayPaymentType('Send')
+    setPayPartner(formData.vendor_name || selectedPO?.vendor?.name || 'Vendor')
+    setPayAmount(String(amt))
+    setPayDate(todayStr())
+    setPayVia('Bank Transfer')
+    setPayNote(`Disbursement for Vendor Bill ${formData.bill_number}`)
+    setPayStatus('Draft')
+    setShowPayGearMenu(false)
+    setShowPayModal(true)
+  }
+
+  // [ Confirm ] inside Bill Payment Modal -> Posts payment, marks bill Paid & prints/downloads voucher!
+  const handleConfirmPaymentModal = async (e) => {
+    if (e && e.preventDefault) e.preventDefault()
+    if (!payAmount || Number(payAmount) <= 0) {
+      setError('Please enter a valid payment amount.')
+      return
+    }
+
+    try {
+      setPayLoading(true)
+      // If bill is still Draft, post it first
+      if (formData.status !== 'Posted' && formData.status !== 'Not Paid' && formData.status !== 'Paid') {
+        await api.patch(`/vendor-bills/${editingId}`, { status: 'Posted' })
+      }
+
+      const payPayload = {
+        payment_type:        'Send',
+        payment_method:      payVia,
+        payment_date:        payDate,
+        amount:              Number(payAmount),
+        note:                payNote || null,
+        vendor_bill_id:      Number(editingId),
+        customer_invoice_id: null
+      }
+      const res = await api.post('/payments/', payPayload)
+
+      setPayStatus('Confirm')
+      setFormData(prev => ({ ...prev, status: 'Paid', amount_paid: Number(payAmount) }))
+      setSuccess(`Payment of ₹${Number(payAmount).toLocaleString('en-IN')} confirmed! Downloading voucher...`)
+
+      // Auto-trigger official voucher download
+      downloadPaymentVoucher({
+        voucherNo:     `VOUCH-PAY-${String(res.data?.id || editingId).padStart(4, '0')}`,
+        paymentType:   'Send',
+        paymentDate:   payDate,
+        paymentMethod: payVia,
+        partnerName:   payPartner,
+        documentRef:   formData.bill_number,
+        poNumber:      selectedPO?.po_number,
+        amount:        Number(payAmount),
+        note:          payNote
+      })
+
+      await fetchBills()
+
+      setTimeout(() => {
+        setShowPayModal(false)
+      }, 1200)
+    } catch (err) {
+      const detail = err.response?.data?.detail
+      setError(typeof detail === 'string' ? detail : 'Failed to record payment.')
+    } finally {
+      setPayLoading(false)
+    }
+  }
+
+  // Download existing voucher on demand
+  const handleDownloadExistingVoucher = (bill = null) => {
+    const b = bill || {
+      id: editingId,
+      bill_number: formData.bill_number,
+      total_amount: formData.total_amount,
+      bill_date: formData.bill_date,
+      vendor_name: formData.vendor_name,
+      purchase_order: selectedPO
+    }
+    const amt = Number(b.total_amount || 0)
+    const vendName = b.vendor?.name || b.purchase_order?.vendor?.name || b.vendor_name || formData.vendor_name || 'Vendor'
+    downloadPaymentVoucher({
+      voucherNo:     `VOUCH-PAY-${String(b.id).padStart(4, '0')}`,
+      paymentType:   'Send',
+      paymentDate:   b.bill_date || todayStr(),
+      paymentMethod: 'Bank Transfer',
+      partnerName:   vendName,
+      documentRef:   b.bill_number,
+      poNumber:      b.purchase_order?.po_number || selectedPO?.po_number,
+      amount:        amt,
+      note:          `Disbursement for Vendor Bill ${b.bill_number}`
+    })
+    setSuccess(`Payment Voucher downloaded for ${b.bill_number}!`)
   }
 
   const handleDelete = async (bill, e) => {
@@ -419,10 +580,34 @@ function VendorBillsPage() {
                       cursor: formData.status === 'Paid' ? 'not-allowed' : 'pointer',
                       boxShadow: formData.status !== 'Paid' ? '0 2px 8px rgba(22, 163, 74, 0.2)' : 'none'
                     }}
-                    title={editingId ? 'Open Bill Payment' : 'Save/Confirm bill first'}
+                    title={formData.status === 'Paid' ? 'Bill is already Paid' : 'Pay bill and download voucher'}
                   >
                     Pay
                   </button>
+
+                  {formData.status === 'Paid' && (
+                    <button
+                      type="button"
+                      onClick={() => handleDownloadExistingVoucher()}
+                      style={{
+                        background: '#047857',
+                        border: '2px solid #047857',
+                        color: '#ffffff',
+                        fontWeight: 700,
+                        fontSize: '14px',
+                        borderRadius: '10px',
+                        padding: '7px 20px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        boxShadow: '0 2px 8px rgba(4, 120, 87, 0.25)'
+                      }}
+                      title="Download Official Payment Voucher"
+                    >
+                      📥 Voucher
+                    </button>
+                  )}
                 </div>
 
                 {/* Right Group: Smart Pill Buttons [ PO ] [ Budget ] [ Cancel ] [ Back ] */}
@@ -568,11 +753,14 @@ function VendorBillsPage() {
                         }}
                       >
                         <option value="">-- Select Confirmed PO --</option>
-                        {pos.map(p => (
-                          <option key={p.id} value={p.id}>
-                            {p.po_number} – {p.vendor?.name} (₹{Number(p.total_amount).toLocaleString('en-IN')})
-                          </option>
-                        ))}
+                        {pos.map(p => {
+                          const isBilled = bills.some(b => Number(b.purchase_order_id) === Number(p.id) && b.id !== editingId)
+                          return (
+                            <option key={p.id} value={p.id}>
+                              {p.po_number} – {p.vendor?.name} (₹{Number(p.total_amount).toLocaleString('en-IN')}) {isBilled ? '— [Bill Already Created]' : ''}
+                            </option>
+                          )
+                        })}
                       </select>
                     </div>
 
@@ -1030,7 +1218,26 @@ function VendorBillsPage() {
                           </span>
                         </td>
                         <td style={{ textAlign: 'center', padding: '12px 14px' }} onClick={(e) => e.stopPropagation()}>
-                          <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+                          <div style={{ display: 'flex', gap: '6px', justifyContent: 'center', alignItems: 'center' }}>
+                            {bill.status === 'Paid' && (
+                              <button
+                                type="button"
+                                onClick={() => handleDownloadExistingVoucher(bill)}
+                                style={{
+                                  background: '#ecfdf5',
+                                  border: '1px solid #10b981',
+                                  color: '#047857',
+                                  padding: '4px 8px',
+                                  fontSize: '12px',
+                                  borderRadius: '6px',
+                                  cursor: 'pointer',
+                                  fontWeight: 600
+                                }}
+                                title="Download Payment Voucher"
+                              >
+                                📥 Voucher
+                              </button>
+                            )}
                             <button
                               type="button"
                               className="btn-edit"
@@ -1071,6 +1278,391 @@ function VendorBillsPage() {
               </span>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* BILL PAYMENT MODAL (Matching Excalidraw Wireframe)          */}
+      {/* ============================================================ */}
+      {showPayModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(15, 23, 42, 0.65)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: '16px'
+        }}>
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '24px',
+            border: '2px solid #e2e8f0',
+            maxWidth: '680px',
+            width: '100%',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            overflow: 'hidden',
+            animation: 'fadeIn 0.2s ease-out'
+          }}>
+            {/* Modal Title */}
+            <div style={{
+              background: '#f8fafc',
+              borderBottom: '1.5px solid #e2e8f0',
+              padding: '20px 28px',
+              textAlign: 'center'
+            }}>
+              <h2 style={{
+                margin: 0,
+                fontSize: '24px',
+                fontWeight: 800,
+                color: '#0f3460',
+                letterSpacing: '-0.5px'
+              }}>
+                Bill Payment
+              </h2>
+              <div style={{ fontSize: '13px', color: '#64748b', marginTop: '4px' }}>
+                Disbursement for Vendor Bill: <strong>{formData.bill_number}</strong>
+              </div>
+            </div>
+
+            <div style={{ padding: '28px 32px' }}>
+              {/* Action Bar matching wireframe: [ Confirm ] [ Cancel ] [ ⚙ ] ... [ Draft ] [ Confirm ] [ Cancelled ] */}
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '24px',
+                flexWrap: 'wrap',
+                gap: '12px'
+              }}>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                  <button
+                    type="button"
+                    onClick={handleConfirmPaymentModal}
+                    disabled={payLoading || payStatus === 'Confirm'}
+                    style={{
+                      background: '#0f3460',
+                      border: '2px solid #0f3460',
+                      color: '#ffffff',
+                      fontWeight: 700,
+                      fontSize: '14px',
+                      borderRadius: '10px',
+                      padding: '7px 22px',
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 8px rgba(15, 52, 96, 0.2)'
+                    }}
+                  >
+                    Confirm
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowPayModal(false)}
+                    style={{
+                      background: '#ffffff',
+                      border: '2px solid #94a3b8',
+                      color: '#64748b',
+                      fontWeight: 700,
+                      fontSize: '14px',
+                      borderRadius: '10px',
+                      padding: '7px 20px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Cancel
+                  </button>
+
+                  {/* Gear Menu ⚙ */}
+                  <div style={{ position: 'relative' }}>
+                    <button
+                      type="button"
+                      onClick={() => setShowPayGearMenu(!showPayGearMenu)}
+                      style={{
+                        background: '#f8fafc',
+                        border: '1.5px solid #cbd5e1',
+                        color: '#475569',
+                        fontWeight: 700,
+                        fontSize: '16px',
+                        borderRadius: '8px',
+                        padding: '6px 12px',
+                        cursor: 'pointer'
+                      }}
+                      title="Settings & Options"
+                    >
+                      ⚙
+                    </button>
+
+                    {showPayGearMenu && (
+                      <div style={{
+                        position: 'absolute',
+                        top: '115%',
+                        left: 0,
+                        background: '#ffffff',
+                        border: '1.5px solid #e2e8f0',
+                        borderRadius: '12px',
+                        boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                        padding: '8px 0',
+                        zIndex: 100,
+                        minWidth: '160px'
+                      }}>
+                        <div style={{ padding: '6px 14px', fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>
+                          Provide Option
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            downloadPaymentVoucher({
+                              voucherNo: `VOUCH-PAY-${String(editingId).padStart(4, '0')}`,
+                              paymentType: 'Send',
+                              paymentDate: payDate,
+                              paymentMethod: payVia,
+                              partnerName: payPartner,
+                              documentRef: formData.bill_number,
+                              poNumber: selectedPO?.po_number,
+                              amount: Number(payAmount),
+                              note: payNote
+                            })
+                            setShowPayGearMenu(false)
+                          }}
+                          style={{
+                            width: '100%',
+                            textAlign: 'left',
+                            padding: '8px 14px',
+                            background: 'transparent',
+                            border: 'none',
+                            fontSize: '13px',
+                            fontWeight: 600,
+                            color: '#1e293b',
+                            cursor: 'pointer'
+                          }}
+                          onMouseEnter={(e) => { e.currentTarget.style.background = '#f1f5f9' }}
+                          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+                        >
+                          1. 🖨️ Print Voucher
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            alert(`Advice email dispatched to ${payPartner}!`)
+                            setShowPayGearMenu(false)
+                          }}
+                          style={{
+                            width: '100%',
+                            textAlign: 'left',
+                            padding: '8px 14px',
+                            background: 'transparent',
+                            border: 'none',
+                            fontSize: '13px',
+                            fontWeight: 600,
+                            color: '#1e293b',
+                            cursor: 'pointer'
+                          }}
+                          onMouseEnter={(e) => { e.currentTarget.style.background = '#f1f5f9' }}
+                          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+                        >
+                          2. ✉️ Send Email
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Right State Pipeline matching wireframe: [ Draft ] [ Confirm ] [ Cancelled ] */}
+                <div style={{ display: 'inline-flex', border: '1px solid #cbd5e1', borderRadius: '8px', overflow: 'hidden' }}>
+                  {['Draft', 'Confirm', 'Cancelled'].map(st => {
+                    const isActive = payStatus === st
+                    return (
+                      <div
+                        key={st}
+                        style={{
+                          padding: '6px 14px',
+                          fontSize: '12px',
+                          fontWeight: 700,
+                          background: isActive ? '#0f3460' : '#f8fafc',
+                          color: isActive ? '#ffffff' : '#64748b',
+                          cursor: 'default'
+                        }}
+                      >
+                        {st}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Fields Grid matching wireframe */}
+              <div style={{
+                background: '#fcfdfe',
+                border: '1.5px solid #e2e8f0',
+                borderRadius: '16px',
+                padding: '24px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '18px'
+              }}>
+                {/* Row 1: Payment Type & Date */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '20px', alignItems: 'center' }}>
+                  <div>
+                    <label style={{ fontSize: '14px', fontWeight: 700, color: '#dc2626', display: 'block', marginBottom: '6px' }}>
+                      Payment Type *
+                    </label>
+                    <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '14px', fontWeight: 600, color: '#1e293b' }}>
+                        <input
+                          type="radio"
+                          name="modal_payment_type"
+                          value="Send"
+                          checked={payPaymentType === 'Send'}
+                          onChange={() => setPayPaymentType('Send')}
+                          style={{ width: '16px', height: '16px', accentColor: '#0f3460' }}
+                        />
+                        Send (Vendor Bill)
+                      </label>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '14px', fontWeight: 600, color: '#64748b' }}>
+                        <input
+                          type="radio"
+                          name="modal_payment_type"
+                          value="Receive"
+                          disabled
+                          style={{ width: '16px', height: '16px', accentColor: '#0f3460' }}
+                        />
+                        Receive
+                      </label>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '14px', fontWeight: 700, color: '#dc2626', display: 'block', marginBottom: '4px' }}>
+                      Date * <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 500 }}>(Default Today's Date)</span>
+                    </label>
+                    <input
+                      type="date"
+                      value={payDate}
+                      onChange={(e) => setPayDate(e.target.value)}
+                      required
+                      style={{
+                        width: '100%',
+                        border: 'none',
+                        borderBottom: '2px solid #0f3460',
+                        background: 'transparent',
+                        padding: '6px 4px',
+                        fontSize: '15px',
+                        outline: 'none',
+                        color: '#1e293b'
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Row 2: Partner & Payment Via */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '20px', alignItems: 'center' }}>
+                  <div>
+                    <label style={{ fontSize: '14px', fontWeight: 700, color: '#dc2626', display: 'block', marginBottom: '4px' }}>
+                      Partner <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 500 }}>(Auto-filled from Bill)</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={payPartner}
+                      readOnly
+                      style={{
+                        width: '100%',
+                        border: 'none',
+                        borderBottom: '2px solid #cbd5e1',
+                        background: '#f8fafc',
+                        padding: '6px 4px',
+                        fontSize: '15px',
+                        fontWeight: 700,
+                        outline: 'none',
+                        color: '#0f3460'
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '14px', fontWeight: 700, color: '#dc2626', display: 'block', marginBottom: '4px' }}>
+                      Payment Via *
+                    </label>
+                    <select
+                      value={payVia}
+                      onChange={(e) => setPayVia(e.target.value)}
+                      style={{
+                        width: '100%',
+                        border: 'none',
+                        borderBottom: '2px solid #0f3460',
+                        background: 'transparent',
+                        padding: '6px 4px',
+                        fontSize: '15px',
+                        fontWeight: 600,
+                        outline: 'none',
+                        color: '#1e293b'
+                      }}
+                    >
+                      <option value="Bank Transfer">Bank Transfer (Default)</option>
+                      <option value="Cash">Cash</option>
+                      <option value="UPI">UPI</option>
+                      <option value="Cheque">Cheque</option>
+                      <option value="NEFT">NEFT</option>
+                      <option value="RTGS">RTGS</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Row 3: Amount Due & Note */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '20px', alignItems: 'center' }}>
+                  <div>
+                    <label style={{ fontSize: '14px', fontWeight: 700, color: '#dc2626', display: 'block', marginBottom: '4px' }}>
+                      Amount (₹) * <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 500 }}>(Auto-filled Amount Due)</span>
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={payAmount}
+                      onChange={(e) => setPayAmount(e.target.value)}
+                      required
+                      style={{
+                        width: '100%',
+                        border: 'none',
+                        borderBottom: '2px solid #0f3460',
+                        background: 'transparent',
+                        padding: '6px 4px',
+                        fontSize: '18px',
+                        fontWeight: 800,
+                        outline: 'none',
+                        color: '#0f3460'
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '14px', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '4px' }}>
+                      Note <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 500 }}>(Alpha Numeric Text)</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={payNote}
+                      onChange={(e) => setPayNote(e.target.value)}
+                      placeholder="Payment remarks..."
+                      style={{
+                        width: '100%',
+                        border: 'none',
+                        borderBottom: '2px solid #cbd5e1',
+                        background: 'transparent',
+                        padding: '6px 4px',
+                        fontSize: '14px',
+                        outline: 'none',
+                        color: '#1e293b'
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}

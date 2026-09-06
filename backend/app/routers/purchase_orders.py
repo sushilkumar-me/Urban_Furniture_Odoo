@@ -5,7 +5,7 @@ from typing import List
 from app.schemas.purchase_order import PurchaseOrderCreate, PurchaseOrderUpdate, PurchaseOrderResponse
 from app.services.purchase_order_service import (
     create_purchase_order, get_all_purchase_orders,
-    get_purchase_order_by_id, update_purchase_order_status, delete_purchase_order
+    get_purchase_order_by_id, update_purchase_order, update_purchase_order_status, delete_purchase_order
 )
 from app.dependencies import get_db, get_current_user, require_admin_or_accountant
 
@@ -28,10 +28,13 @@ def create(data: PurchaseOrderCreate, db: Session = Depends(get_db),
     return create_purchase_order(data=data, db=db)
 
 
-# PATCH is used for partial updates — here just changing status.
-# PATCH /purchase-orders/{id}/status
-# Body: {"status": "Confirmed"}
-# We use PATCH (not PUT) because we are only changing ONE field.
+@router.put("/{po_id}", response_model=PurchaseOrderResponse)
+@router.patch("/{po_id}", response_model=PurchaseOrderResponse)
+def update(po_id: int, data: PurchaseOrderUpdate, db: Session = Depends(get_db),
+           current_user: dict = Depends(require_admin_or_accountant)):
+    return update_purchase_order(po_id=po_id, data=data, db=db)
+
+
 @router.patch("/{po_id}/status", response_model=PurchaseOrderResponse)
 def update_status(po_id: int, data: PurchaseOrderUpdate, db: Session = Depends(get_db),
                   current_user: dict = Depends(require_admin_or_accountant)):

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import api from '../api'
 
 const todayStr = () => new Date().toISOString().split('T')[0]
@@ -29,10 +29,11 @@ function PurchaseOrdersPage() {
   const [loading, setLoading]         = useState(false)
 
   const navigate = useNavigate()
+  const location = useLocation()
 
   useEffect(() => {
     fetchInitialData()
-  }, [])
+  }, [location.search])
 
   const fetchInitialData = async () => {
     try {
@@ -46,6 +47,34 @@ function PurchaseOrdersPage() {
       setVendors(contactRes.data)
       setProducts(prodRes.data)
       setAnalytics(anaRes.data)
+
+      const params = new URLSearchParams(location.search)
+      const statusParam = params.get('status')
+      const isNew = params.get('new')
+
+      if (statusParam) {
+        setFilterStatus(statusParam)
+        setShowForm(false)
+      }
+      if (isNew === 'true') {
+        const nextSeq = poRes.data.length + 1
+        setFormData({
+          vendor_id: contactRes.data.length > 0 ? String(contactRes.data[0].id) : '',
+          po_number: `P${String(nextSeq).padStart(5, '0')}`,
+          po_date:   todayStr(),
+          status:    'Draft',
+          items: [
+            {
+              product_id: prodRes.data.length > 0 ? String(prodRes.data[0].id) : '',
+              analytic_account_id: anaRes.data.length > 0 ? String(anaRes.data[0].id) : '',
+              quantity: 1,
+              unit_price: prodRes.data.length > 0 ? String(prodRes.data[0].cost_price || 0) : ''
+            }
+          ]
+        })
+        setEditingId(null)
+        setShowForm(true)
+      }
     } catch {
       setError('Failed to load purchase order data.')
     }
@@ -91,7 +120,7 @@ function PurchaseOrdersPage() {
     setFormData({
       vendor_id: String(po.vendor_id),
       po_number: po.po_number,
-      po_date:   po.po_date || todayStr(),
+      po_date:   po.po_date ? String(po.po_date).split('T')[0] : todayStr(),
       status:    po.status || 'Draft',
       items: po.items && po.items.length > 0
         ? po.items.map(it => ({
@@ -231,9 +260,10 @@ function PurchaseOrdersPage() {
       return
     }
 
+    const currentUserId = Number(localStorage.getItem('user_id')) || 49
     const payload = {
       vendor_id:  Number(formData.vendor_id),
-      created_by: 1, // Default to admin
+      created_by: currentUserId,
       po_number:  formData.po_number.trim(),
       po_date:    formData.po_date,
       items: formData.items.map(it => ({
@@ -246,7 +276,7 @@ function PurchaseOrdersPage() {
 
     try {
       if (editingId) {
-        // If already exists, update status if requested
+        await api.put(`/purchase-orders/${editingId}`, payload)
         if (overrideStatus) {
           await api.patch(`/purchase-orders/${editingId}/status`, { status: overrideStatus })
         }

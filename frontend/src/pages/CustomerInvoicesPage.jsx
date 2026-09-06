@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import api from '../api'
+import { downloadPaymentVoucher } from '../utils/voucherGenerator'
 
 const todayStr = () => new Date().toISOString().split('T')[0]
 
@@ -32,6 +33,18 @@ function CustomerInvoicesPage() {
   const [success, setSuccess]         = useState('')
   const [loading, setLoading]         = useState(false)
 
+  // Invoice Payment Modal State (Matching Excalidraw Wireframe)
+  const [showPayModal, setShowPayModal]       = useState(false)
+  const [payPaymentType, setPayPaymentType]   = useState('Receive')
+  const [payPartner, setPayPartner]           = useState('')
+  const [payAmount, setPayAmount]             = useState('')
+  const [payDate, setPayDate]                 = useState(todayStr())
+  const [payVia, setPayVia]                   = useState('Bank Transfer')
+  const [payNote, setPayNote]                 = useState('')
+  const [payStatus, setPayStatus]             = useState('Draft')
+  const [payLoading, setPayLoading]           = useState(false)
+  const [showPayGearMenu, setShowPayGearMenu] = useState(false)
+
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -60,7 +73,7 @@ function CustomerInvoicesPage() {
       if (targetSoId) {
         const so = soRes.data.find(s => String(s.id) === String(targetSoId))
         if (so) {
-          handlePrefillFromSO(so, invRes.data.length)
+          handlePrefillFromSO(so, invRes.data.length, invRes.data)
         }
       }
     } catch {
@@ -82,7 +95,15 @@ function CustomerInvoicesPage() {
     return `INV/2026/${String(nextSeq).padStart(4, '0')}`
   }
 
-  const handlePrefillFromSO = (so, count) => {
+  const handlePrefillFromSO = (so, count, allInvoices = null) => {
+    const invList = allInvoices || invoices
+    const existingInv = invList.find(i => Number(i.sales_order_id) === Number(so.id))
+    if (existingInv) {
+      openEditForm(existingInv)
+      setSuccess(`Opened existing Customer Invoice "${existingInv.invoice_number}" for SO ${so.so_number}.`)
+      return
+    }
+
     setSelectedSO(so)
     setFormData({
       sales_order_id:    String(so.id),
@@ -100,9 +121,10 @@ function CustomerInvoicesPage() {
   }
 
   const handleNew = () => {
-    const firstSO = sos.find(s => s.status === 'Confirmed') || sos[0]
-    if (firstSO) {
-      handlePrefillFromSO(firstSO, invoices.length)
+    const invoicedSoIds = new Set(invoices.map(i => Number(i.sales_order_id)))
+    const unbilledSO = sos.find(s => s.status === 'Confirmed' && !invoicedSoIds.has(Number(s.id))) || sos.find(s => !invoicedSoIds.has(Number(s.id)))
+    if (unbilledSO) {
+      handlePrefillFromSO(unbilledSO, invoices.length)
     } else {
       setFormData({
         ...emptyForm,
@@ -150,14 +172,21 @@ function CustomerInvoicesPage() {
   const handleHeaderChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value })
     if (e.target.name === 'sales_order_id' && e.target.value) {
+      const existingInv = invoices.find(i => String(i.sales_order_id) === e.target.value)
+      if (existingInv && existingInv.id !== editingId) {
+        openEditForm(existingInv)
+        setSuccess(`Opened existing Customer Invoice "${existingInv.invoice_number}" for this Sales Order.`)
+        return
+      }
       const so = sos.find(s => String(s.id) === e.target.value)
       if (so) {
         setSelectedSO(so)
         setFormData(prev => ({
           ...prev,
-          sales_order_id: String(so.id),
-          customer_name:  so.customer?.name || '',
-          total_amount:   Number(so.total_amount) || 0
+          sales_order_id:    String(so.id),
+          invoice_reference: `SO-REF-${so.so_number}`,
+          customer_name:     so.customer?.name || '',
+          total_amount:      Number(so.total_amount) || 0
         }))
       }
     }
@@ -197,8 +226,19 @@ function CustomerInvoicesPage() {
         })
         setSuccess(`Customer Invoice "${formData.invoice_number}" updated.`)
       } else {
-        await api.post('/customer-invoices/', payload)
-        setSuccess(`Customer Invoice "${formData.invoice_number}" created successfully.`)
+        const existingInv = invoices.find(i => Number(i.sales_order_id) === Number(formData.sales_order_id))
+        if (existingInv) {
+          setEditingId(existingInv.id)
+          await api.patch(`/customer-invoices/${existingInv.id}`, {
+            invoice_number: formData.invoice_number.trim(),
+            invoice_date:   formData.invoice_date,
+            due_date:       formData.due_date || null
+          })
+          setSuccess(`Updated existing Customer Invoice "${formData.invoice_number}".`)
+        } else {
+          await api.post('/customer-invoices/', payload)
+          setSuccess(`Customer Invoice "${formData.invoice_number}" created successfully.`)
+        }
       }
       await fetchInvoices()
       closeForm()
@@ -219,13 +259,39 @@ function CustomerInvoicesPage() {
   }
 
   const handleConfirmInvoice = async () => {
-    if (!editingId) {
-      await handleSubmit()
-      return
+    let invIdToConfirm = editingId
+    if (!invIdToConfirm) {
+      const existingInv = invoices.find(i => Number(i.sales_order_id) === Number(formData.sales_order_id))
+      if (existingInv) {
+        invIdToConfirm = existingInv.id
+        setEditingId(existingInv.id)
+      } else {
+        if (!formData.sales_order_id) {
+          setError('Please select a Sales Order first.')
+          return
+        }
+        try {
+          setLoading(true)
+          const res = await api.post('/customer-invoices/', {
+            sales_order_id: Number(formData.sales_order_id),
+            invoice_number: formData.invoice_number.trim() || `INV-AUTO-${Date.now().toString().slice(-4)}`,
+            invoice_date:   formData.invoice_date || todayStr(),
+            due_date:       formData.due_date || null,
+            total_amount:   Number(formData.total_amount)
+          })
+          invIdToConfirm = res.data.id
+          setEditingId(res.data.id)
+        } catch (err) {
+          setError(err.response?.data?.detail || 'Failed to create customer invoice.')
+          setLoading(false)
+          return
+        }
+      }
     }
+
     try {
       setLoading(true)
-      await api.patch(`/customer-invoices/${editingId}`, { status: 'Posted' })
+      await api.patch(`/customer-invoices/${invIdToConfirm}`, { status: 'Posted' })
       setSuccess(`Customer Invoice "${formData.invoice_number}" Confirmed & Posted to General Ledger!`)
       setFormData(prev => ({ ...prev, status: 'Not Paid' }))
       await fetchInvoices()
@@ -255,10 +321,104 @@ function CustomerInvoicesPage() {
     }
   }
 
-  // [ Pay ] -> Opens Invoice Payment screen prefilling invoice details
+  // [ Pay ] -> Opens Invoice Payment Modal showing Payment Type, Partner, Payment Via, Amount, Date, etc.
   const handlePayInvoice = () => {
-    if (!editingId) return
-    navigate(`/payments?invoice_id=${editingId}`)
+    if (!editingId) {
+      setError('Please save or confirm the customer invoice first.')
+      return
+    }
+    const amt = Number(formData.total_amount || 0)
+    setPayPaymentType('Receive')
+    setPayPartner(formData.customer_name || selectedSO?.customer?.name || 'Customer')
+    setPayAmount(String(amt))
+    setPayDate(todayStr())
+    setPayVia('Bank Transfer')
+    setPayNote(`Settlement for Customer Invoice ${formData.invoice_number}`)
+    setPayStatus('Draft')
+    setShowPayGearMenu(false)
+    setShowPayModal(true)
+  }
+
+  // [ Confirm ] inside Invoice Payment Modal -> Posts receipt, marks invoice Paid & prints/downloads voucher!
+  const handleConfirmPaymentModal = async (e) => {
+    if (e && e.preventDefault) e.preventDefault()
+    if (!payAmount || Number(payAmount) <= 0) {
+      setError('Please enter a valid payment amount.')
+      return
+    }
+
+    try {
+      setPayLoading(true)
+      // If invoice is still Draft, post it first
+      if (formData.status !== 'Posted' && formData.status !== 'Not Paid' && formData.status !== 'Paid') {
+        await api.patch(`/customer-invoices/${editingId}`, { status: 'Posted' })
+      }
+
+      const payPayload = {
+        payment_type:        'Receive',
+        payment_method:      payVia,
+        payment_date:        payDate,
+        amount:              Number(payAmount),
+        note:                payNote || null,
+        vendor_bill_id:      null,
+        customer_invoice_id: Number(editingId)
+      }
+      const res = await api.post('/payments/', payPayload)
+
+      setPayStatus('Confirm')
+      setFormData(prev => ({ ...prev, status: 'Paid', amount_paid: Number(payAmount) }))
+      setSuccess(`Payment receipt of ₹${Number(payAmount).toLocaleString('en-IN')} confirmed! Downloading voucher...`)
+
+      // Auto-trigger official voucher download
+      downloadPaymentVoucher({
+        voucherNo:     `VOUCH-REC-${String(res.data?.id || editingId).padStart(4, '0')}`,
+        paymentType:   'Receive',
+        paymentDate:   payDate,
+        paymentMethod: payVia,
+        partnerName:   payPartner,
+        documentRef:   formData.invoice_number,
+        soNumber:      selectedSO?.so_number,
+        amount:        Number(payAmount),
+        note:          payNote
+      })
+
+      await fetchInvoices()
+
+      setTimeout(() => {
+        setShowPayModal(false)
+      }, 1200)
+    } catch (err) {
+      const detail = err.response?.data?.detail
+      setError(typeof detail === 'string' ? detail : 'Failed to record payment receipt.')
+    } finally {
+      setPayLoading(false)
+    }
+  }
+
+  // Download existing voucher on demand
+  const handleDownloadExistingVoucher = (inv = null) => {
+    const item = inv || {
+      id: editingId,
+      invoice_number: formData.invoice_number,
+      total_amount: formData.total_amount,
+      invoice_date: formData.invoice_date,
+      customer_name: formData.customer_name,
+      sales_order: selectedSO
+    }
+    const amt = Number(item.total_amount || 0)
+    const custName = item.sales_order?.customer?.name || item.customer_name || formData.customer_name || 'Customer'
+    downloadPaymentVoucher({
+      voucherNo:     `VOUCH-REC-${String(item.id).padStart(4, '0')}`,
+      paymentType:   'Receive',
+      paymentDate:   item.invoice_date || todayStr(),
+      paymentMethod: 'Bank Transfer',
+      partnerName:   custName,
+      documentRef:   item.invoice_number,
+      soNumber:      item.sales_order?.so_number || selectedSO?.so_number,
+      amount:        amt,
+      note:          `Settlement for Customer Invoice ${item.invoice_number}`
+    })
+    setSuccess(`Receipt Voucher downloaded for ${item.invoice_number}!`)
   }
 
   const handleDelete = async (inv, e) => {
@@ -420,10 +580,34 @@ function CustomerInvoicesPage() {
                       cursor: formData.status === 'Paid' ? 'not-allowed' : 'pointer',
                       boxShadow: formData.status !== 'Paid' ? '0 2px 8px rgba(22, 163, 74, 0.2)' : 'none'
                     }}
-                    title={editingId ? 'Open Invoice Payment' : 'Save/Confirm invoice first'}
+                    title={formData.status === 'Paid' ? 'Invoice is already Paid' : 'Receive payment and download voucher'}
                   >
                     Pay
                   </button>
+
+                  {formData.status === 'Paid' && (
+                    <button
+                      type="button"
+                      onClick={() => handleDownloadExistingVoucher()}
+                      style={{
+                        background: '#047857',
+                        border: '2px solid #047857',
+                        color: '#ffffff',
+                        fontWeight: 700,
+                        fontSize: '14px',
+                        borderRadius: '10px',
+                        padding: '7px 20px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        boxShadow: '0 2px 8px rgba(4, 120, 87, 0.25)'
+                      }}
+                      title="Download Official Payment Voucher"
+                    >
+                      📥 Voucher
+                    </button>
+                  )}
                 </div>
 
                 {/* Right Group: Smart Pill Buttons [ SO ] [ Budget ] [ Cancel ] [ Back ] */}
@@ -569,11 +753,14 @@ function CustomerInvoicesPage() {
                         }}
                       >
                         <option value="">-- Select Confirmed SO --</option>
-                        {sos.map(s => (
-                          <option key={s.id} value={s.id}>
-                            {s.so_number} – {s.customer?.name} (₹{Number(s.total_amount).toLocaleString('en-IN')})
-                          </option>
-                        ))}
+                        {sos.map(s => {
+                          const isInvoiced = invoices.some(i => Number(i.sales_order_id) === Number(s.id) && i.id !== editingId)
+                          return (
+                            <option key={s.id} value={s.id}>
+                              {s.so_number} – {s.customer?.name} (₹{Number(s.total_amount).toLocaleString('en-IN')}) {isInvoiced ? '— [Invoice Already Created]' : ''}
+                            </option>
+                          )
+                        })}
                       </select>
                     </div>
 
@@ -1045,38 +1232,58 @@ function CustomerInvoicesPage() {
                           </span>
                         </td>
                         <td style={{ padding: '12px 14px', textAlign: 'center' }}>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); openEditForm(inv) }}
-                            style={{
-                              background: '#f8fafc',
-                              border: '1px solid #cbd5e1',
-                              color: '#0f3460',
-                              borderRadius: '6px',
-                              padding: '4px 10px',
-                              fontSize: '12px',
-                              fontWeight: 600,
-                              cursor: 'pointer',
-                              marginRight: '6px'
-                            }}
-                          >
-                            View
-                          </button>
-                          <button
-                            onClick={(e) => handleDelete(inv, e)}
-                            style={{
-                              background: '#fff1f2',
-                              border: '1px solid #fecdd3',
-                              color: '#e11d48',
-                              borderRadius: '6px',
-                              padding: '4px 8px',
-                              fontSize: '12px',
-                              fontWeight: 600,
-                              cursor: 'pointer'
-                            }}
-                            title="Delete Invoice"
-                          >
-                            🗑️
-                          </button>
+                          <div style={{ display: 'flex', gap: '6px', justifyContent: 'center', alignItems: 'center' }}>
+                            {inv.status === 'Paid' && (
+                              <button
+                                type="button"
+                                onClick={() => handleDownloadExistingVoucher(inv)}
+                                style={{
+                                  background: '#ecfdf5',
+                                  border: '1px solid #10b981',
+                                  color: '#047857',
+                                  padding: '4px 8px',
+                                  fontSize: '12px',
+                                  borderRadius: '6px',
+                                  cursor: 'pointer',
+                                  fontWeight: 600
+                                }}
+                                title="Download Payment Receipt Voucher"
+                              >
+                                📥 Voucher
+                              </button>
+                            )}
+                            <button
+                              onClick={(e) => { e.stopPropagation(); openEditForm(inv) }}
+                              style={{
+                                background: '#f8fafc',
+                                border: '1px solid #cbd5e1',
+                                color: '#0f3460',
+                                borderRadius: '6px',
+                                padding: '4px 10px',
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                cursor: 'pointer'
+                              }}
+                            >
+                              View
+                            </button>
+                            <button
+                              onClick={(e) => handleDelete(inv, e)}
+                              style={{
+                                background: '#fff1f2',
+                                border: '1px solid #fecdd3',
+                                color: '#e11d48',
+                                borderRadius: '6px',
+                                padding: '4px 8px',
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                cursor: 'pointer'
+                              }}
+                              title="Delete Invoice"
+                            >
+                              🗑️
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -1084,6 +1291,391 @@ function CustomerInvoicesPage() {
                 </table>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* INVOICE PAYMENT MODAL (Matching Excalidraw Wireframe)        */}
+      {/* ============================================================ */}
+      {showPayModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(15, 23, 42, 0.65)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: '16px'
+        }}>
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '24px',
+            border: '2px solid #e2e8f0',
+            maxWidth: '680px',
+            width: '100%',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            overflow: 'hidden',
+            animation: 'fadeIn 0.2s ease-out'
+          }}>
+            {/* Modal Title */}
+            <div style={{
+              background: '#f8fafc',
+              borderBottom: '1.5px solid #e2e8f0',
+              padding: '20px 28px',
+              textAlign: 'center'
+            }}>
+              <h2 style={{
+                margin: 0,
+                fontSize: '24px',
+                fontWeight: 800,
+                color: '#0f3460',
+                letterSpacing: '-0.5px'
+              }}>
+                Invoice Payment
+              </h2>
+              <div style={{ fontSize: '13px', color: '#64748b', marginTop: '4px' }}>
+                Collection for Customer Invoice: <strong>{formData.invoice_number}</strong>
+              </div>
+            </div>
+
+            <div style={{ padding: '28px 32px' }}>
+              {/* Action Bar matching wireframe: [ Confirm ] [ Cancel ] [ ⚙ ] ... [ Draft ] [ Confirm ] [ Cancelled ] */}
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '24px',
+                flexWrap: 'wrap',
+                gap: '12px'
+              }}>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                  <button
+                    type="button"
+                    onClick={handleConfirmPaymentModal}
+                    disabled={payLoading || payStatus === 'Confirm'}
+                    style={{
+                      background: '#0f3460',
+                      border: '2px solid #0f3460',
+                      color: '#ffffff',
+                      fontWeight: 700,
+                      fontSize: '14px',
+                      borderRadius: '10px',
+                      padding: '7px 22px',
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 8px rgba(15, 52, 96, 0.2)'
+                    }}
+                  >
+                    Confirm
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowPayModal(false)}
+                    style={{
+                      background: '#ffffff',
+                      border: '2px solid #94a3b8',
+                      color: '#64748b',
+                      fontWeight: 700,
+                      fontSize: '14px',
+                      borderRadius: '10px',
+                      padding: '7px 20px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Cancel
+                  </button>
+
+                  {/* Gear Menu ⚙ */}
+                  <div style={{ position: 'relative' }}>
+                    <button
+                      type="button"
+                      onClick={() => setShowPayGearMenu(!showPayGearMenu)}
+                      style={{
+                        background: '#f8fafc',
+                        border: '1.5px solid #cbd5e1',
+                        color: '#475569',
+                        fontWeight: 700,
+                        fontSize: '16px',
+                        borderRadius: '8px',
+                        padding: '6px 12px',
+                        cursor: 'pointer'
+                      }}
+                      title="Settings & Options"
+                    >
+                      ⚙
+                    </button>
+
+                    {showPayGearMenu && (
+                      <div style={{
+                        position: 'absolute',
+                        top: '115%',
+                        left: 0,
+                        background: '#ffffff',
+                        border: '1.5px solid #e2e8f0',
+                        borderRadius: '12px',
+                        boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                        padding: '8px 0',
+                        zIndex: 100,
+                        minWidth: '160px'
+                      }}>
+                        <div style={{ padding: '6px 14px', fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>
+                          Provide Option
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            downloadPaymentVoucher({
+                              voucherNo: `VOUCH-REC-${String(editingId).padStart(4, '0')}`,
+                              paymentType: 'Receive',
+                              paymentDate: payDate,
+                              paymentMethod: payVia,
+                              partnerName: payPartner,
+                              documentRef: formData.invoice_number,
+                              soNumber: selectedSO?.so_number,
+                              amount: Number(payAmount),
+                              note: payNote
+                            })
+                            setShowPayGearMenu(false)
+                          }}
+                          style={{
+                            width: '100%',
+                            textAlign: 'left',
+                            padding: '8px 14px',
+                            background: 'transparent',
+                            border: 'none',
+                            fontSize: '13px',
+                            fontWeight: 600,
+                            color: '#1e293b',
+                            cursor: 'pointer'
+                          }}
+                          onMouseEnter={(e) => { e.currentTarget.style.background = '#f1f5f9' }}
+                          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+                        >
+                          1. 🖨️ Print Receipt
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            alert(`Receipt email dispatched to ${payPartner}!`)
+                            setShowPayGearMenu(false)
+                          }}
+                          style={{
+                            width: '100%',
+                            textAlign: 'left',
+                            padding: '8px 14px',
+                            background: 'transparent',
+                            border: 'none',
+                            fontSize: '13px',
+                            fontWeight: 600,
+                            color: '#1e293b',
+                            cursor: 'pointer'
+                          }}
+                          onMouseEnter={(e) => { e.currentTarget.style.background = '#f1f5f9' }}
+                          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+                        >
+                          2. ✉️ Send Email
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Right State Pipeline matching wireframe: [ Draft ] [ Confirm ] [ Cancelled ] */}
+                <div style={{ display: 'inline-flex', border: '1px solid #cbd5e1', borderRadius: '8px', overflow: 'hidden' }}>
+                  {['Draft', 'Confirm', 'Cancelled'].map(st => {
+                    const isActive = payStatus === st
+                    return (
+                      <div
+                        key={st}
+                        style={{
+                          padding: '6px 14px',
+                          fontSize: '12px',
+                          fontWeight: 700,
+                          background: isActive ? '#0f3460' : '#f8fafc',
+                          color: isActive ? '#ffffff' : '#64748b',
+                          cursor: 'default'
+                        }}
+                      >
+                        {st}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Fields Grid matching wireframe */}
+              <div style={{
+                background: '#fcfdfe',
+                border: '1.5px solid #e2e8f0',
+                borderRadius: '16px',
+                padding: '24px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '18px'
+              }}>
+                {/* Row 1: Payment Type & Date */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '20px', alignItems: 'center' }}>
+                  <div>
+                    <label style={{ fontSize: '14px', fontWeight: 700, color: '#dc2626', display: 'block', marginBottom: '6px' }}>
+                      Payment Type *
+                    </label>
+                    <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '14px', fontWeight: 600, color: '#64748b' }}>
+                        <input
+                          type="radio"
+                          name="modal_inv_payment_type"
+                          value="Send"
+                          disabled
+                          style={{ width: '16px', height: '16px', accentColor: '#0f3460' }}
+                        />
+                        Send
+                      </label>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '14px', fontWeight: 600, color: '#1e293b' }}>
+                        <input
+                          type="radio"
+                          name="modal_inv_payment_type"
+                          value="Receive"
+                          checked={payPaymentType === 'Receive'}
+                          onChange={() => setPayPaymentType('Receive')}
+                          style={{ width: '16px', height: '16px', accentColor: '#0f3460' }}
+                        />
+                        Receive (Customer Invoice)
+                      </label>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '14px', fontWeight: 700, color: '#dc2626', display: 'block', marginBottom: '4px' }}>
+                      Date * <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 500 }}>(Default Today's Date)</span>
+                    </label>
+                    <input
+                      type="date"
+                      value={payDate}
+                      onChange={(e) => setPayDate(e.target.value)}
+                      required
+                      style={{
+                        width: '100%',
+                        border: 'none',
+                        borderBottom: '2px solid #0f3460',
+                        background: 'transparent',
+                        padding: '6px 4px',
+                        fontSize: '15px',
+                        outline: 'none',
+                        color: '#1e293b'
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Row 2: Partner & Payment Via */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '20px', alignItems: 'center' }}>
+                  <div>
+                    <label style={{ fontSize: '14px', fontWeight: 700, color: '#dc2626', display: 'block', marginBottom: '4px' }}>
+                      Partner <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 500 }}>(Auto-filled from Invoice)</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={payPartner}
+                      readOnly
+                      style={{
+                        width: '100%',
+                        border: 'none',
+                        borderBottom: '2px solid #cbd5e1',
+                        background: '#f8fafc',
+                        padding: '6px 4px',
+                        fontSize: '15px',
+                        fontWeight: 700,
+                        outline: 'none',
+                        color: '#0f3460'
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '14px', fontWeight: 700, color: '#dc2626', display: 'block', marginBottom: '4px' }}>
+                      Payment Via *
+                    </label>
+                    <select
+                      value={payVia}
+                      onChange={(e) => setPayVia(e.target.value)}
+                      style={{
+                        width: '100%',
+                        border: 'none',
+                        borderBottom: '2px solid #0f3460',
+                        background: 'transparent',
+                        padding: '6px 4px',
+                        fontSize: '15px',
+                        fontWeight: 600,
+                        outline: 'none',
+                        color: '#1e293b'
+                      }}
+                    >
+                      <option value="Bank Transfer">Bank Transfer (Default)</option>
+                      <option value="Cash">Cash</option>
+                      <option value="UPI">UPI</option>
+                      <option value="Cheque">Cheque</option>
+                      <option value="NEFT">NEFT</option>
+                      <option value="RTGS">RTGS</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Row 3: Amount Due & Note */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '20px', alignItems: 'center' }}>
+                  <div>
+                    <label style={{ fontSize: '14px', fontWeight: 700, color: '#dc2626', display: 'block', marginBottom: '4px' }}>
+                      Amount (₹) * <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 500 }}>(Auto-filled Amount Due)</span>
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={payAmount}
+                      onChange={(e) => setPayAmount(e.target.value)}
+                      required
+                      style={{
+                        width: '100%',
+                        border: 'none',
+                        borderBottom: '2px solid #0f3460',
+                        background: 'transparent',
+                        padding: '6px 4px',
+                        fontSize: '18px',
+                        fontWeight: 800,
+                        outline: 'none',
+                        color: '#0f3460'
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '14px', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '4px' }}>
+                      Note <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 500 }}>(Alpha Numeric Text)</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={payNote}
+                      onChange={(e) => setPayNote(e.target.value)}
+                      placeholder="Payment remarks..."
+                      style={{
+                        width: '100%',
+                        border: 'none',
+                        borderBottom: '2px solid #cbd5e1',
+                        background: 'transparent',
+                        padding: '6px 4px',
+                        fontSize: '14px',
+                        outline: 'none',
+                        color: '#1e293b'
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
