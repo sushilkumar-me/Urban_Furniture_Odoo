@@ -7,7 +7,6 @@ function LoginPage() {
   const [formData, setFormData]       = useState({ login_id: '', password: '' })
   const [error, setError]             = useState('')
   const [loading, setLoading]         = useState(false)
-  const [showForgotModal, setShowForgotModal] = useState(false)
   const navigate                      = useNavigate()
 
   const handleChange = (e) => {
@@ -181,27 +180,19 @@ function LoginPage() {
             </button>
           </div>
 
-          {/* 5. Forgot Password | Sign Up (Matching Excalidraw Wireframe) */}
+          {/* 5. Sign Up */}
           <div style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: '12px',
+            gap: '6px',
             fontSize: '13px',
             color: '#64748b'
           }}>
-            <span
-              onClick={() => setShowForgotModal(true)}
-              style={{ color: '#0f3460', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}
-            >
-              Forgot Password
-            </span>
-
-            <span style={{ color: '#cbd5e1', fontWeight: 700 }}>|</span>
-
+            <span>Don't have an account?</span>
             <span
               onClick={() => navigate('/signup')}
-              style={{ color: '#0f3460', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}
+              style={{ color: '#0f3460', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}
             >
               Sign Up
             </span>
@@ -209,58 +200,7 @@ function LoginPage() {
 
         </form>
 
-        {/* Demo Credentials Quick-Reference Helper */}
-        <div style={{
-          marginTop: '28px',
-          padding: '12px 14px',
-          background: '#f8fafc',
-          borderRadius: '10px',
-          border: '1px dashed #cbd5e1',
-          fontSize: '12px',
-          color: '#475569'
-        }}>
-          <div style={{ fontWeight: 700, color: '#0f3460', marginBottom: '4px' }}>
-            💡 Quick Demo Logins (Password: <code>Password123!</code>):
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px', fontSize: '11px' }}>
-            <span>🛡️ Admin: <code>admin</code></span>
-            <span>📊 Accountant: <code>ramesh_ca</code></span>
-            <span>🛒 Customer: <code>cust_infosys</code></span>
-            <span>🚚 Vendor: <code>vend_greenpl</code></span>
-          </div>
-        </div>
-
       </div>
-
-      {/* Forgot Password Modal */}
-      {showForgotModal && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center',
-          justifyContent: 'center', zIndex: 1000, padding: '20px'
-        }}>
-          <div className="form-card" style={{ maxWidth: '400px', width: '100%', margin: 0, borderRadius: '16px', padding: '24px' }}>
-            <h3 style={{ margin: '0 0 10px 0', fontSize: '18px', color: '#1a1a2e' }}>
-              🔑 Reset Password Assistance
-            </h3>
-            <p style={{ fontSize: '13px', color: '#64748b', lineHeight: 1.5, marginBottom: '16px' }}>
-              For security reasons, password resets are handled through the System Administrator.
-            </p>
-            <div style={{ background: '#f1f5f9', padding: '12px', borderRadius: '8px', fontSize: '12px', color: '#334155', marginBottom: '20px' }}>
-              Please contact your administrator at:<br />
-              <strong>support@urbanfurniture.com</strong> or <strong>admin@urbanfurniture.com</strong>.<br /><br />
-              <em>(All pre-seeded demo accounts use default password: <code>Password123!</code>)</em>
-            </div>
-            <button
-              className="btn-primary"
-              onClick={() => setShowForgotModal(false)}
-              style={{ width: '100%', height: '40px', borderRadius: '8px' }}
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      )}
 
     </div>
   )
