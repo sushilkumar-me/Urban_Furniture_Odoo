@@ -13,8 +13,8 @@
 > Inspired by **Odoo Enterprise**, it bridges the gap between commercial operations (Sales, Purchasing, Inventory) and financial governance (Double-Entry Bookkeeping, Managerial Cost Centers, and Real-Time Portals for Customers and Vendors).
 
 ---
-![Database Schema ERD Diagram](<img width="4257" height="2533" alt="db" src="https://github.com/user-attachments/assets/171844fa-8de9-49a8-8eae-eee103b25494" />)
-*Figure 2: 17-Table Enterprise Relational Architecture (Excalidraw Design).*
+
+*Database Schema*
 <img width="4257" height="2533" alt="db" src="https://github.com/user-attachments/assets/205a8fa8-39d5-48d7-ba8e-c8a77580e160" />
 
 ## 📸 Application Showcase
