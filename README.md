@@ -1,4 +1,4 @@
-# 🪑 Urban Furniture ERP — Enterprise Accounting & Operations System
+# 🪑 Urban Furniture ERP
 
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.111.0-009688.svg?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![React](https://img.shields.io/badge/React-18.2.0-61DAFB.svg?logo=react&logoColor=black)](https://reactjs.org/)
@@ -20,8 +20,9 @@
 <!-- USER SCREENSHOT PLACEHOLDER: ATTACH YOUR PROJECT SCREENSHOT HERE  -->
 <!-- Replace the path below with your image file (e.g. ./docs/screenshots/dashboard.png) -->
 <!-- ================================================================= -->
-![Urban Furniture ERP Executive Dashboard](./docs/screenshots/project_dashboard.png)
-*Figure 1: Executive Operations Dashboard — Live Financial KPIs, Sales/Purchase Charts, and Dynamic Budget Tracking.*
+![Urban Furniture ERP Executive Dashboard]()
+<img width="1919" height="917" alt="image" src="https://github.com/user-attachments/assets/5888fe72-d72d-414d-b766-aeee64156c84" />
+
 
 ---
 
@@ -33,7 +34,7 @@ The system is powered by a **fully normalized 3rd Normal Form (3NF)** relational
 <!-- USER SCREENSHOT PLACEHOLDER: ATTACH YOUR DATABASE SCHEMA HERE     -->
 <!-- Replace the path below with your Excalidraw / DB schema screenshot -->
 <!-- ================================================================= -->
-![Database Schema ERD Diagram](./docs/screenshots/database_schema_erd.png)
+![Database Schema ERD Diagram](<img width="4257" height="2533" alt="db" src="https://github.com/user-attachments/assets/171844fa-8de9-49a8-8eae-eee103b25494" />)
 *Figure 2: 17-Table Enterprise Relational Architecture (Excalidraw Design).*
 
 ### 🧱 Core Relational Architecture (17 Tables)
