@@ -13,6 +13,9 @@
 > Inspired by **Odoo Enterprise**, it bridges the gap between commercial operations (Sales, Purchasing, Inventory) and financial governance (Double-Entry Bookkeeping, Managerial Cost Centers, and Real-Time Portals for Customers and Vendors).
 
 ---
+![Database Schema ERD Diagram](<img width="4257" height="2533" alt="db" src="https://github.com/user-attachments/assets/171844fa-8de9-49a8-8eae-eee103b25494" />)
+*Figure 2: 17-Table Enterprise Relational Architecture (Excalidraw Design).*
+<img width="4257" height="2533" alt="db" src="https://github.com/user-attachments/assets/205a8fa8-39d5-48d7-ba8e-c8a77580e160" />
 
 ## 📸 Application Showcase
 
@@ -20,8 +23,12 @@
 <!-- USER SCREENSHOT PLACEHOLDER: ATTACH YOUR PROJECT SCREENSHOT HERE  -->
 <!-- Replace the path below with your image file (e.g. ./docs/screenshots/dashboard.png) -->
 <!-- ================================================================= -->
-![Urban Furniture ERP Executive Dashboard]()
-<img width="1919" height="917" alt="image" src="https://github.com/user-attachments/assets/5888fe72-d72d-414d-b766-aeee64156c84" />
+<img width="1919" height="914" alt="image" src="https://github.com/user-attachments/assets/7c9ce735-ea0b-42a2-ab52-4dab5dbf3ebd" />
+<img width="1918" height="907" alt="image" src="https://github.com/user-attachments/assets/7b8c9e56-c294-4783-8d53-0097619cb4c4" />
+<img width="1919" height="916" alt="image" src="https://github.com/user-attachments/assets/6b0ed0bd-14c4-4a77-94e3-844745db43b2" />
+<img width="1919" height="923" alt="image" src="https://github.com/user-attachments/assets/46985f38-b5e9-46c7-8c97-5cde5413c6de" />
+<img width="1919" height="918" alt="image" src="https://github.com/user-attachments/assets/60060188-4d83-4dfa-8eed-af3f146a72c2" />
+<img width="1919" height="914" alt="image" src="https://github.com/user-attachments/assets/2adcc42c-b0db-458d-b1c8-b0efe75b8aaa" />
 
 
 ---
@@ -34,8 +41,7 @@ The system is powered by a **fully normalized 3rd Normal Form (3NF)** relational
 <!-- USER SCREENSHOT PLACEHOLDER: ATTACH YOUR DATABASE SCHEMA HERE     -->
 <!-- Replace the path below with your Excalidraw / DB schema screenshot -->
 <!-- ================================================================= -->
-![Database Schema ERD Diagram](<img width="4257" height="2533" alt="db" src="https://github.com/user-attachments/assets/171844fa-8de9-49a8-8eae-eee103b25494" />)
-*Figure 2: 17-Table Enterprise Relational Architecture (Excalidraw Design).*
+
 
 ### 🧱 Core Relational Architecture (17 Tables)
 
